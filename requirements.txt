@@ -1,2 +1,7 @@
 flask
 requests
+meteostat
+python-dotenv
+gunicorn
+pandas
+numpy
