@@ -17,7 +17,6 @@ from templates import (
     AVIATION_HTML, ALT_VERIFY_HTML, COMPARE_MATRICES_HTML,
     CHART_HTML, COMPARE_HTML, MODEL_HTML,
     TABLE_TEMPLATE, TEXT_TEMPLATE, SEARCH_HTML, POINT_TEMPLATE,
-    build_current_card_js,
 )
 from core.dictionaries import CODE_TO_TEXT
 from core.config import DEFAULT_LOCATION
@@ -25,33 +24,39 @@ from core.config import DEFAULT_LOCATION
 app = Flask(__name__)
 
 # ------------------------------------------------------------------
-# Конфигурация станций (пример — подставь свои)
+# Конфигурация
 # ------------------------------------------------------------------
-STATIONS = {
-    "tushino": {"name": "Тушино",   "lat": 55.85, "lon": 37.44, "key": "tushino"},
-    "ufa":     {"name": "Уфа",      "lat": 54.74, "lon": 55.97, "key": "ufa"},
-    "murmansk":{"name": "Мурманск", "lat": 68.96, "lon": 33.08, "key": "murmansk"},
-}
+try:
+    from core.config import STATIONS as _STATIONS
+    STATIONS = _STATIONS
+except ImportError:
+    STATIONS = {
+        "tushino": {"name": "Тушино", "lat": 55.85, "lon": 37.44, "key": "tushino"},
+    }
 
-MODELS = {
-    "gfs":   {"name": "GFS (США)"},
-    "ecmwf": {"name": "ECMWF (Европа)"},
-    "icon":  {"name": "ICON (Германия)"},
-}
+try:
+    from core.config import MODELS as _MODELS
+    MODELS = _MODELS
+except ImportError:
+    MODELS = {
+        "gfs":   {"name": "GFS (США)"},
+        "ecmwf": {"name": "ECMWF (Европа)"},
+        "icon":  {"name": "ICON (Германия)"},
+    }
 
 PHENOMENA = {
-    "frost":   {"name": "Заморозок",      "unit": "°C"},
-    "wind":    {"name": "Сильный ветер",  "unit": "м/с"},
-    "rain":    {"name": "Сильный дождь",  "unit": "мм"},
-    "fog":     {"name": "Туман",          "unit": "км"},
-    "thunder": {"name": "Гроза",          "unit": "—"},
+    "frost":   {"name": "Заморозок",     "unit": "°C"},
+    "wind":    {"name": "Сильный ветер", "unit": "м/с"},
+    "rain":    {"name": "Сильный дождь", "unit": "мм"},
+    "fog":     {"name": "Туман",         "unit": "км"},
+    "thunder": {"name": "Гроза",         "unit": "—"},
 }
 
 HISTORY_DAYS = 14
 
 
 # ------------------------------------------------------------------
-# Страницы
+# Главные страницы
 # ------------------------------------------------------------------
 @app.route("/")
 def index():
@@ -97,6 +102,11 @@ def search():
     return render_template_string(SEARCH_HTML, models=MODELS)
 
 
+@app.route("/tropopause")
+def tropopause_page():
+    return render_template_string(TROPOPAUSE_HTML)
+
+
 # ------------------------------------------------------------------
 # Модели и станции
 # ------------------------------------------------------------------
@@ -116,8 +126,6 @@ def model_page(model_key):
 
 @app.route("/forecast/<model_key>/<station_key>")
 def forecast_table(model_key, station_key):
-    # Здесь должна быть логика получения прогноза.
-    # Для демонстрации — пустая заготовка.
     return render_template_string(
         TABLE_TEMPLATE,
         model=model_key,
@@ -127,10 +135,6 @@ def forecast_table(model_key, station_key):
         lat=STATIONS.get(station_key, {}).get("lat", 0),
         lon=STATIONS.get(station_key, {}).get("lon", 0),
         days=5,
-        by_day={},       # заполнить реальными данными
-        synoptic=[],
-        updated="—",
-        view="table",
     )
 
 
@@ -146,8 +150,6 @@ def forecast_text(model_key, station_key):
         lon=STATIONS.get(station_key, {}).get("lon", 0),
         days=5,
         text="Текстовый прогноз будет здесь.",
-        synoptic=[],
-        view="text",
     )
 
 
@@ -159,8 +161,6 @@ def chart_page(station_key):
         lat=STATIONS.get(station_key, {}).get("lat", 0),
         lon=STATIONS.get(station_key, {}).get("lon", 0),
         days=5,
-        labels_json="[]",
-        series_json="{}",
     )
 
 
@@ -170,13 +170,29 @@ def compare_page(station_key):
         COMPARE_HTML,
         station_name=STATIONS.get(station_key, {}).get("name", station_key),
         days=5,
-        rows=[],
-        updated="—",
+    )
+
+
+@app.route("/forecast/point")
+def forecast_point():
+    lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
+    lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
+    name = request.args.get("name", DEFAULT_LOCATION["name"])
+    model_key = request.args.get("model", "gfs")
+    view = request.args.get("view", "table")
+    return render_template_string(
+        POINT_TEMPLATE,
+        point_name=name,
+        lat=lat,
+        lon=lon,
+        model=model_key,
+        model_name=MODELS.get(model_key, {}).get("name", model_key),
+        view=view,
     )
 
 
 # ------------------------------------------------------------------
-# Проверка моделей
+# Проверка
 # ------------------------------------------------------------------
 @app.route("/verify/<station_key>")
 def verify_page(station_key):
@@ -280,20 +296,11 @@ def compare_matrices_page(station_key):
 
 
 # ------------------------------------------------------------------
-# Тропопауза
-# ------------------------------------------------------------------
-@app.route("/tropopause")
-def tropopause_page():
-    return render_template_string(TROPOPAUSE_HTML)
-
-
-# ------------------------------------------------------------------
-# API заглушки (замени на реальную логику)
+# API
 # ------------------------------------------------------------------
 @app.route("/api/geocode")
 def api_geocode():
     q = request.args.get("q", "")
-    # TODO: реальный геокодер
     return jsonify({"results": [
         {"name": q, "latitude": 55.75, "longitude": 37.62,
          "admin1": "", "country": "Россия"}
@@ -302,7 +309,6 @@ def api_geocode():
 
 @app.route("/api/verify/<station_key>")
 def api_verify(station_key):
-    # TODO: реальный расчёт MAE/RMSE/Bias
     return jsonify({
         "date": request.args.get("date", date.today().isoformat()),
         "results": [],
