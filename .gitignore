@@ -1,0 +1,54 @@
+
+# Python
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Кэш и данные
+.cache/
+.cache.sqlite
+.cache_openmeteo.sqlite
+*.csv
+*.xlsx
+isd_data/
+isd_moscow/
+openmeteo_data/
+rp5_data/
+
+# Изображения и карты (если не нужны в репо)
+*.png
+*.tif
+
+# Установщики и большие файлы
+*.exe
+*.zip
+*.pdf
+
+# Системные файлы
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Редакторы
+.vscode/
+.idea/
+
+# Мои рабочие файлы DeepSeek
+deepseek_*.py
+deepseek_*.txt
+
+# HTML-карты
+stations_map*.html
+
+# Текстовые документы
+Новый текстовый документ*.txt
+*.txt
+
+# Но оставить README
+!README.md
+!requirements.txt
