@@ -130,6 +130,17 @@ BASE_STYLE = """
   }
   .fade-in { animation: fadeInUp 0.4s ease-out backwards; }
 
+  .synoptic-badge {
+    display: inline-block; padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; margin: 2px 4px 2px 0;
+    font-family: 'Inter', sans-serif; backdrop-filter: blur(6px);
+  }
+  .synoptic-cold_front   { background: rgba(77,171,255,0.15); color: #4dabff; border: 1px solid rgba(77,171,255,0.3); }
+  .synoptic-warm_front   { background: rgba(255,181,71,0.15); color: #ffb547; border: 1px solid rgba(255,181,71,0.3); }
+  .synoptic-cyclone      { background: rgba(124,92,255,0.15); color: #a78bfa; border: 1px solid rgba(124,92,255,0.3); }
+  .synoptic-anticyclone  { background: rgba(0,229,160,0.15); color: #00e5a0; border: 1px solid rgba(0,229,160,0.3); }
+  .synoptic-fold         { background: rgba(255,84,112,0.15); color: #ff5470; border: 1px solid rgba(255,84,112,0.3); }
+
   .top-controls {
     position: fixed; top: 16px; left: 16px; z-index: 9999;
     display: flex; gap: 8px;
@@ -244,9 +255,6 @@ def render_top_controls():
     """
 
 
-# ============================================================
-# ХАБЫ РАЗДЕЛОВ
-# ============================================================
 FORECAST_HUB_HTML = """<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -358,7 +366,7 @@ THEORY_HUB_HTML = """<!DOCTYPE html>
 
 <a class="card fade-in" href="/alt-verify/tushino" style="animation-delay: 0.10s;background:rgba(0,229,160,0.10);">
   <span class="icon">📋</span><b>Матрица альтернативных прогнозов</b>
-  <div class="desc">Критерии Хандожко: p, H, Q, v, τ, A — метод / инерц. / случайный / климатология</div>
+  <div class="desc">Критерии Хандожко: p, H, Q, v, τ, A</div>
 </a>
 
 <a class="card fade-in" href="/compare-matrices/tushino" style="animation-delay: 0.15s;background:rgba(255,181,71,0.15);">
@@ -373,7 +381,7 @@ THEORY_HUB_HTML = """<!DOCTYPE html>
 
 <a class="card fade-in" href="/teaching" style="animation-delay: 0.25s;background:rgba(0,229,160,0.08);">
   <span class="icon">📚</span><b>Учебные примеры</b>
-  <div class="desc">Разборы из учебника Дробжевой и Волобуевой (заморозки, ветер, пожары)</div>
+  <div class="desc">Разборы из учебника Дробжевой и Волобуевой</div>
 </a>
 
 """ + COMMON_JS + render_top_controls() + """
@@ -382,9 +390,6 @@ THEORY_HUB_HTML = """<!DOCTYPE html>
 """
 
 
-# ============================================================
-# ГЛАВНАЯ
-# ============================================================
 INDEX_HTML = """<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -423,9 +428,8 @@ INDEX_HTML = """<!DOCTYPE html>
 </html>
 """
 
-
 # ============================================================
-# ОСТАЛЬНЫЕ СТРАНИЦЫ (простые рабочие версии)
+# ОСТАЛЬНЫЕ СТРАНИЦЫ
 # ============================================================
 ABOUT_HTML = """<!DOCTYPE html>
 <html lang="ru">
