@@ -170,3 +170,105 @@ def analyze_period(model_key, lat, lon, days=14):
         "scatter": scatter,
         "histogram": bins,
     }
+
+
+def analyze_by_day(model_key, lat, lon, days=14):
+    """
+    Разбивка статистики по дням для одной модели.
+
+    Возвращает:
+    {
+        "model": "gfs",
+        "model_name": "GFS (США)",
+        "days": [
+            {"date": "2024-01-15", "mae": 1.2, "bias": -0.3, "rmse": 1.6,
+             "hours": 24, "corr": 0.95, "error": None},
+            ...
+        ],
+        "summary": {
+            "mae": ..., "bias": ..., "rmse": ...,
+            "hours_total": ..., "days_total": ...
+        }
+    }
+    """
+    today = datetime.now().date()
+    days_list = []
+
+    for d in range(days, 0, -1):
+        date_str = (today - timedelta(days=d)).strftime("%Y-%m-%d")
+        if date_str < MIN_VERIFY_DATE:
+            continue
+
+        try:
+            fact, source = fetch_actual(lat, lon, date_str)
+            fcst = fetch_previous_run(model_key, lat, lon, date_str)
+        except Exception as e:
+            days_list.append({
+                "date": date_str,
+                "mae": None, "bias": None, "rmse": None,
+                "hours": 0, "corr": None,
+                "error": f"нет данных: {e}",
+            })
+            continue
+
+        fact_h = fact.get("hourly", {})
+        fcst_h = fcst.get("hourly", {})
+
+        f_t = dict(zip(fact_h.get("time", []), fact_h.get("temperature_2m", [])))
+        o_t = dict(zip(fcst_h.get("time", []),
+                       fcst_h.get("temperature_2m_previous_day1", [])))
+
+        facts, preds = [], []
+        for t in sorted(set(f_t) & set(o_t)):
+            fv, ov = f_t.get(t), o_t.get(t)
+            if fv is not None and ov is not None:
+                facts.append(fv); preds.append(ov)
+
+        if not facts:
+            days_list.append({
+                "date": date_str,
+                "mae": None, "bias": None, "rmse": None,
+                "hours": 0, "corr": None,
+                "error": "нет парных значений",
+            })
+            continue
+
+        errors = [p - f for f, p in zip(facts, preds)]
+        mae = sum(abs(e) for e in errors) / len(errors)
+        bias = sum(errors) / len(errors)
+        rmse = math.sqrt(sum(e ** 2 for e in errors) / len(errors))
+        corr = _pearson(facts, preds)
+
+        days_list.append({
+            "date": date_str,
+            "mae": round(mae, 2),
+            "bias": round(bias, 2),
+            "rmse": round(rmse, 2),
+            "hours": len(errors),
+            "corr": round(corr, 3) if corr is not None else None,
+            "error": None,
+        })
+
+    # Сводка за весь период
+    valid = [d for d in days_list if d["mae"] is not None]
+    if valid:
+        all_mae = [d["mae"] for d in valid]
+        all_bias = [d["bias"] for d in valid]
+        all_rmse = [d["rmse"] for d in valid]
+        summary = {
+            "mae": round(sum(all_mae) / len(all_mae), 2),
+            "bias": round(sum(all_bias) / len(all_bias), 2),
+            "rmse": round(sum(all_rmse) / len(all_rmse), 2),
+            "hours_total": sum(d["hours"] for d in valid),
+            "days_total": len(valid),
+        }
+    else:
+        summary = {"mae": None, "bias": None, "rmse": None,
+                   "hours_total": 0, "days_total": 0}
+
+    return {
+        "model": model_key,
+        "model_name": MODELS[model_key]["name"],
+        "days": days_list,
+        "summary": summary,
+    }

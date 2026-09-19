@@ -64,6 +64,7 @@ def parse_hourly(data):
             "precipitation_mm": p,
             "weather_code": c,
             "temp_c": t_c,
+            "dew_point_c": dew2m_i,
             "wind_ms": wind_i,
             "wind_dir": wdir[i] if i < len(wdir) else None,
             "humidity": rh_i,

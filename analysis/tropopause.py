@@ -76,7 +76,9 @@ def compute_epv_profile(hourly_data, lat, lon, hour_index):
         height_arr = hourly.get(height_key, [])
 
         t = temp_arr[hour_index] if hour_index < len(temp_arr) else None
-        ws = wind_arr[hour_index] if hour_index < len(wind_arr) else None
+        ws_raw = wind_arr[hour_index] if hour_index < len(wind_arr) else None
+        # Open-Meteo отдаёт wind_speed в км/ч → перевод в м/с
+        ws = (ws_raw / 3.6) if ws_raw is not None else None
         wd = wdir_arr[hour_index] if hour_index < len(wdir_arr) else None
         h = height_arr[hour_index] if hour_index < len(height_arr) else None
 
@@ -91,6 +93,8 @@ def compute_epv_profile(hourly_data, lat, lon, hour_index):
             "wind_dir": wd,
             "height_m": h,
             "theta_k": theta_k,
+            "pv_pvu": None,
+            "is_stratosphere": None,
         })
 
     # Считаем PV между соседними уровнями
@@ -103,7 +107,7 @@ def compute_epv_profile(hourly_data, lat, lon, hour_index):
             continue
 
         d_theta = upper["theta_k"] - lower["theta_k"]  # К
-        d_p = lower["pressure_pa"] - upper["pressure_pa"]  # Па (положительно)
+        d_p = upper["pressure_pa"] - lower["pressure_pa"]  # Па (отрицательно)
 
         if d_p == 0:
             upper["pv_pvu"] = None
@@ -162,20 +166,25 @@ def detect_folds(hourly_data, lat, lon, hour_index):
     high_pv_levels = [p for p in profile if (p.get("pv_pvu") or 0) >= PVU_THRESHOLD]
 
     if not high_pv_levels:
+        # Считаем max_pv по всем уровням (даже без складок — для графика и сводки)
+        all_pvs = [p["pv_pvu"] for p in profile if p.get("pv_pvu") is not None]
+        max_pv_all = max(all_pvs) if all_pvs else 0
         return {
             "has_fold": False,
             "fold_levels": [],
-            "max_pv": 0,
+            "max_pv": round(max_pv_all, 2),
             "fold_depth_hPa": 0,
             "description": "Складок не обнаружено",
             "tropopause_level_hPa": result["tropopause_level_hPa"],
+            "profile": profile,
         }
 
     # Типичная тропопауза для умеренных широт — около 250 гПа
     # Если PV > 2 PVU обнаружен ниже 300 гПа — это складка
     fold_levels = [p for p in high_pv_levels if p["level"] >= 300]
 
-    max_pv = max(p["pv_pvu"] for p in high_pv_levels if p.get("pv_pvu") is not None)
+    all_pvs = [p["pv_pvu"] for p in profile if p.get("pv_pvu") is not None]
+    max_pv = max(all_pvs) if all_pvs else 0
 
     # Глубина складки: разница между самым верхним и самым нижним уровнями с PV > 2
     if len(high_pv_levels) > 1:

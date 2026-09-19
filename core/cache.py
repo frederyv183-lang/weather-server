@@ -35,5 +35,5 @@ class TTLCache:
 
 # Глобальные экземпляры кэшей
 _forecast_cache = TTLCache(ttl_seconds=600)
-_verify_cache = TTLCache(ttl_seconds=3600)
+_verify_cache = TTLCache(ttl_seconds=300)
 _current_cache = TTLCache(ttl_seconds=300)
