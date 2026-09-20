@@ -15,6 +15,8 @@ from analysis.aviation import combined_thunder_risk, fog_forecast
 def parse_hourly(data):
     hourly = data.get("hourly", {})
     times = hourly.get("time", [])
+
+    # --- Приземные ---
     prec  = hourly.get("precipitation", [])
     code  = hourly.get("weather_code", [])
     temp  = hourly.get("temperature_2m", [])
@@ -24,36 +26,80 @@ def parse_hourly(data):
     press = hourly.get("pressure_msl", [])
     cloud = hourly.get("cloud_cover", [])
     gust  = hourly.get("wind_gusts_10m", [])
-
-    t500  = hourly.get("temperature_500hPa", [])
-    t700  = hourly.get("temperature_700hPa", [])
-    td700 = hourly.get("dew_point_700hPa", [])
-    t850  = hourly.get("temperature_850hPa", [])
-    td850 = hourly.get("dew_point_850hPa", [])
+    dew2m = hourly.get("dew_point_2m", [])
     cape_arr = hourly.get("cape", [])
     li_arr   = hourly.get("lifted_index", [])
-    dew2m = hourly.get("dew_point_2m", [])
+
+    # --- Уровни: температура ---
+    t925 = hourly.get("temperature_925hPa", [])
+    t850 = hourly.get("temperature_850hPa", [])
+    t700 = hourly.get("temperature_700hPa", [])
+    t500 = hourly.get("temperature_500hPa", [])
+    t300 = hourly.get("temperature_300hPa", [])
+
+    # --- Уровни: точка росы ---
+    td925 = hourly.get("dew_point_925hPa", [])
+    td850 = hourly.get("dew_point_850hPa", [])
+    td700 = hourly.get("dew_point_700hPa", [])
+    td500 = hourly.get("dew_point_500hPa", [])
+    td300 = hourly.get("dew_point_300hPa", [])
+
+    # --- Уровни: ветер (скорость + направление) ---
+    w925  = hourly.get("wind_speed_925hPa", [])
+    wd925 = hourly.get("wind_direction_925hPa", [])
+    w850  = hourly.get("wind_speed_850hPa", [])
+    wd850 = hourly.get("wind_direction_850hPa", [])
+    w700  = hourly.get("wind_speed_700hPa", [])
+    wd700 = hourly.get("wind_direction_700hPa", [])
+    w500  = hourly.get("wind_speed_500hPa", [])
+    wd500 = hourly.get("wind_direction_500hPa", [])
+    w300  = hourly.get("wind_speed_300hPa", [])
+    wd300 = hourly.get("wind_direction_300hPa", [])
+
+    # --- Уровни: геопотенциальная высота ---
+    h925 = hourly.get("geopotential_height_925hPa", [])
+    h850 = hourly.get("geopotential_height_850hPa", [])
+    h700 = hourly.get("geopotential_height_700hPa", [])
+    h500 = hourly.get("geopotential_height_500hPa", [])
+    h300 = hourly.get("geopotential_height_300hPa", [])
+
+    def _at(arr, i):
+        return arr[i] if i < len(arr) else None
 
     result = []
     for i, t in enumerate(times):
-        c = code[i] if i < len(code) else None
-        p = prec[i] if i < len(prec) else 0
-        t_c = temp[i] if i < len(temp) else None
-        pr = press[i] if i < len(press) else None
-        rh_i = rh[i] if i < len(rh) else None
-        cloud_i = cloud[i] if i < len(cloud) else None
-        wind_i = wind[i] if i < len(wind) else None
-        dew2m_i = dew2m[i] if i < len(dew2m) else None
-
-        t500_i = t500[i] if i < len(t500) else None
-        t700_i = t700[i] if i < len(t700) else None
-        td700_i = td700[i] if i < len(td700) else None
-        t850_i = t850[i] if i < len(t850) else None
-        td850_i = td850[i] if i < len(td850) else None
-        cape_i = cape_arr[i] if i < len(cape_arr) else None
-        li_i = li_arr[i] if i < len(li_arr) else None
+        c = _at(code, i)
+        p = _at(prec, i) or 0
+        t_c = _at(temp, i)
+        pr = _at(press, i)
+        rh_i = _at(rh, i)
+        cloud_i = _at(cloud, i)
+        wind_i = _at(wind, i)
+        dew2m_i = _at(dew2m, i)
+        cape_i = _at(cape_arr, i)
+        li_i = _at(li_arr, i)
         hour_int = int(t[11:13])
 
+        # Уровневые значения
+        t925_i = _at(t925, i); td925_i = _at(td925, i)
+        t850_i = _at(t850, i); td850_i = _at(td850, i)
+        t700_i = _at(t700, i); td700_i = _at(td700, i)
+        t500_i = _at(t500, i); td500_i = _at(td500, i)
+        t300_i = _at(t300, i); td300_i = _at(td300, i)
+
+        w925_i = _at(w925, i); wd925_i = _at(wd925, i)
+        w850_i = _at(w850, i); wd850_i = _at(wd850, i)
+        w700_i = _at(w700, i); wd700_i = _at(wd700, i)
+        w500_i = _at(w500, i); wd500_i = _at(wd500, i)
+        w300_i = _at(w300, i); wd300_i = _at(wd300, i)
+
+        h925_i = _at(h925, i)
+        h850_i = _at(h850, i)
+        h700_i = _at(h700, i)
+        h500_i = _at(h500, i)
+        h300_i = _at(h300, i)
+
+        # Авиация
         av_thunder = combined_thunder_risk(
             t850_i, td850_i, t700_i, td700_i, t500_i, li_i, cape_i
         )
@@ -66,17 +112,41 @@ def parse_hourly(data):
             "temp_c": t_c,
             "dew_point_c": dew2m_i,
             "wind_ms": wind_i,
-            "wind_dir": wdir[i] if i < len(wdir) else None,
+            "wind_dir": _at(wdir, i),
             "humidity": rh_i,
             "pressure_hpa": pr,
             "theta_k": calculate_potential_temperature(t_c, pr),
             "cloud_cover": cloud_i,
-            "wind_gust": gust[i] if i < len(gust) else None,
+            "wind_gust": _at(gust, i),
             "is_fog": c in (45, 48),
             "is_thunder": c in (95, 96, 99),
             "is_precip": p is not None and p > 0,
             "av_thunder": av_thunder,
             "av_fog": av_fog,
+
+            # ==================================================
+            # УРОВНИ — для синоптического анализа
+            # ==================================================
+            # Температура и точка росы
+            "t925": t925_i, "td925": td925_i,
+            "t850": t850_i, "td850": td850_i,
+            "t700": t700_i, "td700": td700_i,
+            "t500": t500_i, "td500": td500_i,
+            "t300": t300_i, "td300": td300_i,
+
+            # Ветер на уровнях (м/с)
+            "wind925_ms": w925_i, "wind925_dir": wd925_i,
+            "wind850_ms": w850_i, "wind850_dir": wd850_i,
+            "wind700_ms": w700_i, "wind700_dir": wd700_i,
+            "wind500_ms": w500_i, "wind500_dir": wd500_i,
+            "wind300_ms": w300_i, "wind300_dir": wd300_i,
+
+            # Геопотенциальная высота (м)
+            "height925_m": h925_i,
+            "height850_m": h850_i,
+            "height700_m": h700_i,
+            "height500_m": h500_i,
+            "height300_m": h300_i,
         })
     return result
 

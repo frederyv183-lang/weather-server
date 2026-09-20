@@ -15,15 +15,48 @@ def fetch_forecast(model, lat, lon, days=FORECAST_DAYS):
     cached = _forecast_cache.get(cache_key)
     if cached is not None: return cached
     endpoint = MODELS[model]["endpoint"]
+
+    # Уровневые переменные для синоптики: 925, 850, 700, 500, 300 гПа
+    # T, Td, ветер (м/с), геопотенциальная высота (м)
+    hourly_vars = [
+        # Базовые приземные
+        "precipitation", "weather_code",
+        "temperature_2m", "dew_point_2m",
+        "wind_speed_10m", "wind_direction_10m",
+        "relative_humidity_2m", "pressure_msl",
+        "cloud_cover", "wind_gusts_10m",
+        "cape", "lifted_index",
+
+        # Температура на уровнях
+        "temperature_925hPa", "temperature_850hPa",
+        "temperature_700hPa", "temperature_500hPa",
+        "temperature_300hPa",
+
+        # Точка росы на уровнях
+        "dew_point_925hPa", "dew_point_850hPa",
+        "dew_point_700hPa", "dew_point_500hPa",
+        "dew_point_300hPa",
+
+        # Ветер на уровнях (скорость + направление)
+        "wind_speed_925hPa", "wind_direction_925hPa",
+        "wind_speed_850hPa", "wind_direction_850hPa",
+        "wind_speed_700hPa", "wind_direction_700hPa",
+        "wind_speed_500hPa", "wind_direction_500hPa",
+        "wind_speed_300hPa", "wind_direction_300hPa",
+
+        # Геопотенциальная высота уровней
+        "geopotential_height_925hPa",
+        "geopotential_height_850hPa",
+        "geopotential_height_700hPa",
+        "geopotential_height_500hPa",
+        "geopotential_height_300hPa",
+    ]
+
     url = (
         f"{endpoint}"
         f"?latitude={lat}&longitude={lon}"
-        f"&hourly=precipitation,weather_code,"
-        f"temperature_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,"
-        f"relative_humidity_2m,pressure_msl,cloud_cover,wind_gusts_10m,"
-        f"cape,lifted_index,"
-        f"temperature_500hPa,temperature_700hPa,dew_point_700hPa,"
-        f"temperature_850hPa,dew_point_850hPa"
+        f"&hourly={','.join(hourly_vars)}"
+        f"&wind_speed_unit=ms"
         f"&forecast_days={days}"
         f"&timezone=Europe/Moscow"
     )

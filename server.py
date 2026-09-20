@@ -9,7 +9,8 @@ import logging
 from datetime import date, timedelta
 
 from flask import Flask, render_template_string, request, jsonify
-
+from tests_bank import TESTS
+from templates import TESTS_HTML
 from templates import (
     INDEX_HTML, MAP_HTML, ABOUT_HTML,
     FORECAST_HUB_HTML, ANALYSIS_HUB_HTML, THEORY_HUB_HTML,
@@ -18,15 +19,25 @@ from templates import (
     AVIATION_HTML, ALT_VERIFY_HTML, COMPARE_MATRICES_HTML,
     CHART_HTML, COMPARE_HTML, MODEL_HTML,
     TABLE_TEMPLATE, TEXT_TEMPLATE, SEARCH_HTML, POINT_TEMPLATE,
+    SYNOPTIC_HTML,
+    CLIMATE_HTML,
+    BIBLIOGRAPHY_HTML, THEORY_METHODS_HTML,
+    THEORY_MATRICES_HTML, THEORY_INDICES_HTML,
 )
-from core.dictionaries import CODE_TO_TEXT
+from core.dictionaries import CODE_TO_TEXT, BIBLIOGRAPHY_ITEMS
 from core.config import DEFAULT_LOCATION
+from core.http import _session
 
 # --- модули для таблицы прогноза ---
 from data.forecast import fetch_forecast
 from analysis.parsing import parse_hourly, prepare_forecast_for_render
 from analysis.synoptic import analyze_synoptic
 from analysis.text_forecast import generate_text_forecast
+from analysis.synoptic_level import (
+    extract_levels, generate_synoptic_text, build_profile_svg,
+    SYNOPTIC_LEVELS, LEVEL_NAMES,
+)
+from analysis.climate_indices import analyze_climate
 
 # --- модули для проверки и анализа ---
 from data.actual import fetch_actual, check_station_availability, fetch_archive
@@ -45,7 +56,7 @@ from analysis.tropopause import analyze_day
 log = logging.getLogger("weather")
 logging.basicConfig(level=logging.INFO)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
 # ------------------------------------------------------------------
@@ -78,15 +89,17 @@ def absval_filter(value):
 # Вспомогательная функция: построение SVG-графика
 # ------------------------------------------------------------------
 def build_chart_svg(series, fact_series, field, unit, title,
-                    decimals=1, width=1100, height=260):
+                    decimals=1, width=1400, height=320,
+                    times_labels=None, step=1):
     """
     Строит SVG-график как строку.
 
     series: список {key, name, color, temps, press, winds, precips}
     fact_series: {name, color, temps, press, winds, precips} | None
     field: 'temps' | 'press' | 'winds' | 'precips'
+    times_labels: список подписей по X
+    step: дискретность точек
     """
-    # Все значения
     all_vals = []
     for s in series:
         for v in s.get(field, []):
@@ -100,14 +113,25 @@ def build_chart_svg(series, fact_series, field, unit, title,
     if not all_vals:
         return '<div class="empty-note">Нет данных для отображения.</div>'
 
-    vmin = min(all_vals)
-    vmax = max(all_vals)
+    if unit == "гПа":
+        vmin = min(all_vals)
+        vmax = max(all_vals)
+        pad_v = (vmax - vmin) * 0.1 or 5
+        vmin -= pad_v
+        vmax += pad_v
+    else:
+        vmin = min(all_vals)
+        vmax = max(all_vals)
+
+    if field == "precips":
+        vmin = 0
+
     vspan = (vmax - vmin) or 1
 
-    pad_left = 55
-    pad_right = 20
+    pad_left = 70
+    pad_right = 30
     pad_top = 20
-    pad_bottom = 40
+    pad_bottom = 60
     plot_w = width - pad_left - pad_right
     plot_h = height - pad_top - pad_bottom
 
@@ -128,55 +152,83 @@ def build_chart_svg(series, fact_series, field, unit, title,
     parts = []
     parts.append(f'<svg viewBox="0 0 {width} {height}" '
                  f'preserveAspectRatio="xMidYMid meet" '
-                 f'style="width:100%;max-width:{width}px;height:auto;">')
+                 f'style="width:100%;height:auto;display:block;">')
 
-    # Фон
     parts.append(f'<rect x="{pad_left}" y="{pad_top}" '
                  f'width="{plot_w}" height="{plot_h}" '
                  f'fill="rgba(15,21,36,0.6)" stroke="rgba(120,160,255,0.15)" '
                  f'stroke-width="0.5" rx="6"/>')
 
-    # Сетка + метки Y
-    for i in range(5):
-        yy = pad_top + plot_h * i / 4
-        val = vmax - vspan * i / 4
+    for i in range(6):
+        yy = pad_top + plot_h * i / 5
+        val = vmax - vspan * i / 5
         parts.append(f'<line x1="{pad_left}" y1="{yy:.2f}" '
                      f'x2="{pad_left + plot_w}" y2="{yy:.2f}" '
                      f'stroke="rgba(120,160,255,0.08)" stroke-width="0.5"/>')
-        parts.append(f'<text x="{pad_left - 6}" y="{yy + 4:.2f}" '
-                     f'text-anchor="end" fill="#8892b0" font-size="10" '
+        parts.append(f'<text x="{pad_left - 10}" y="{yy + 5:.2f}" '
+                     f'text-anchor="end" fill="#a8b4d0" font-size="13" '
                      f'font-family="JetBrains Mono, monospace">{fmt(val)}</text>')
 
-    # Линии моделей
+    if times_labels and n > 1:
+        label_step = max(1, n // 12)
+        if step > 1:
+            label_step = max(label_step, step)
+
+        for i in range(0, n, label_step):
+            xx = x(i)
+            label = times_labels[i] if i < len(times_labels) else ""
+            parts.append(f'<line x1="{xx:.2f}" y1="{pad_top + plot_h}" '
+                         f'x2="{xx:.2f}" y2="{pad_top + plot_h + 5}" '
+                         f'stroke="rgba(120,160,255,0.3)" stroke-width="0.5"/>')
+            parts.append(f'<text x="{xx:.2f}" y="{pad_top + plot_h + 20}" '
+                         f'text-anchor="middle" fill="#a8b4d0" font-size="12" '
+                         f'font-family="JetBrains Mono, monospace">{label}</text>')
+
     for s in series:
         vals = s.get(field, [])
         pts = []
+        color = s.get("color", "#4dabff")
+
+        circles = []
         for idx, v in enumerate(vals):
             if v is not None:
-                pts.append(f"{x(idx):.2f},{y(v):.2f}")
+                px = x(idx)
+                py = y(v)
+                pts.append(f"{px:.2f},{py:.2f}")
+                if idx % step == 0:
+                    label_txt = times_labels[idx] if times_labels and idx < len(times_labels) else ""
+                    circles.append(
+                        f'<circle cx="{px:.2f}" cy="{py:.2f}" r="3" '
+                        f'fill="{color}" stroke="var(--bg-0)" stroke-width="1" '
+                        f'data-time="{label_txt}" '
+                        f'data-value="{fmt(v)}" '
+                        f'data-unit="{unit}" '
+                        f'data-model="{s.get("name", "")}" '
+                        f'style="cursor:pointer;"/>'
+                    )
+
         if pts:
-            color = s.get("color", "#4dabff")
             parts.append(f'<polyline fill="none" stroke="{color}" '
                          f'stroke-width="2" stroke-linejoin="round" '
                          f'stroke-linecap="round" points="{" ".join(pts)}"/>')
+            parts.extend(circles)
 
-    # Факт
     if fact_series:
         vals = fact_series.get(field, [])
         pts = []
+        color = fact_series.get("color", "#a8b4d0")
         for idx, v in enumerate(vals):
             if v is not None:
                 pts.append(f"{x(idx):.2f},{y(v):.2f}")
         if pts:
-            color = fact_series.get("color", "#a8b4d0")
             parts.append(f'<polyline fill="none" stroke="{color}" '
                          f'stroke-width="1.5" stroke-opacity="0.7" '
+                         f'stroke-dasharray="4 3" '
                          f'stroke-linejoin="round" stroke-linecap="round" '
                          f'points="{" ".join(pts)}"/>')
 
-    # Метка единиц
-    parts.append(f'<text x="8" y="{pad_top - 6}" '
-                 f'fill="#6b7694" font-size="10" '
+    parts.append(f'<text x="8" y="{pad_top - 4}" '
+                 f'fill="#6b7694" font-size="12" '
                  f'font-family="Inter, sans-serif">{unit}</text>')
 
     parts.append('</svg>')
@@ -215,13 +267,12 @@ PHENOMENA = {
 
 HISTORY_DAYS = 14
 
-# Цвета для моделей (для /chart)
 _MODEL_COLORS = {
-    "gfs":   "#4dabff",   # синий
-    "ecmwf": "#ffb547",   # оранжевый
-    "icon":  "#00e5a0",   # зелёный
+    "gfs":   "#4dabff",
+    "ecmwf": "#ffb547",
+    "icon":  "#00e5a0",
 }
-_FACT_COLOR = "#a8b4d0"   # серый
+_FACT_COLOR = "#a8b4d0"
 
 
 # ------------------------------------------------------------------
@@ -231,6 +282,15 @@ _FACT_COLOR = "#a8b4d0"   # серый
 def index():
     return render_template_string(INDEX_HTML)
 
+@app.route("/tests")
+def tests_page():
+    """Страница тестов: выбор блока, прохождение, результат."""
+    import json as _json
+    return render_template_string(
+        TESTS_HTML,
+        tests=TESTS,
+        tests_json=_json.dumps(TESTS, ensure_ascii=False),
+    )
 
 @app.route("/about")
 def about():
@@ -252,6 +312,39 @@ def theory_hub():
     return render_template_string(THEORY_HUB_HTML)
 
 
+# ------------------------------------------------------------------
+# НОВЫЕ РОУТЫ: теория по группам + библиография
+# ------------------------------------------------------------------
+@app.route("/bibliography")
+def bibliography_page():
+    """Библиография: источники по всем разделам."""
+    return render_template_string(
+        BIBLIOGRAPHY_HTML,
+        bibliography=BIBLIOGRAPHY_ITEMS,
+    )
+
+
+@app.route("/theory/methods")
+def theory_methods():
+    """Теория: методы прогноза (изоэнтропика, PV, синоптика)."""
+    return render_template_string(THEORY_METHODS_HTML)
+
+
+@app.route("/theory/matrices")
+def theory_matrices():
+    """Теория: матрицы сопряжённости и критерии Хандожко."""
+    return render_template_string(THEORY_MATRICES_HTML)
+
+
+@app.route("/theory/indices")
+def theory_indices():
+    """Теория: индексы неустойчивости и явления."""
+    return render_template_string(THEORY_INDICES_HTML)
+
+
+# ------------------------------------------------------------------
+# Карта, обучение, климат
+# ------------------------------------------------------------------
 @app.route("/map")
 def map_page():
     return render_template_string(
@@ -266,9 +359,48 @@ def teaching():
     return render_template_string(TEACHING_HTML)
 
 
+@app.route("/climate")
+def climate_page():
+    """Климатические индексы: ENSO, SSW, PV."""
+    try:
+        days_back = int(request.args.get("days", 365))
+    except (TypeError, ValueError):
+        days_back = 365
+    days_back = max(30, min(days_back, 730))
+
+    try:
+        data = analyze_climate(days_back=days_back)
+    except Exception as e:
+        log.exception("climate: error: %s", e)
+        return render_template_string(
+            CLIMATE_HTML,
+            period={"start": "—", "end": "—"},
+            days_back=days_back,
+            enso=None, ssw=None, pv=None,
+            error=str(e),
+        )
+
+    return render_template_string(
+        CLIMATE_HTML,
+        period=data.get("period") or {"start": "—", "end": "—"},
+        days_back=days_back,
+        enso=data.get("enso"),
+        ssw=data.get("ssw"),
+        pv=data.get("pv"),
+        error=data.get("error"),
+    )
+
+
 @app.route("/search")
 def search():
-    return render_template_string(SEARCH_HTML, models=MODELS)
+    """Поиск точки: geocoding или координаты."""
+    return render_template_string(
+        SEARCH_HTML,
+        models=MODELS,
+        preset_lat=request.args.get("lat"),
+        preset_lon=request.args.get("lon"),
+        preset_name=request.args.get("name", ""),
+    )
 
 
 @app.route("/tropopause")
@@ -288,7 +420,6 @@ def tropopause_page():
         hour_index = 12
     hour_index = max(0, min(hour_index, 23))
 
-    # Загрузка данных
     try:
         raw = fetch_pressure_level_data(lat, lon, target_date)
     except Exception as e:
@@ -307,7 +438,6 @@ def tropopause_page():
             max_pv_day_scale=1.0,
         )
 
-    # Анализ дня
     try:
         day_result = analyze_day(raw, lat, lon)
     except Exception as e:
@@ -326,14 +456,12 @@ def tropopause_page():
             max_pv_day_scale=1.0,
         )
 
-    # Выбираем конкретный час
     hours = day_result.get("hours", [])
     if hour_index >= len(hours):
         hour_index = min(len(hours) - 1, 12)
 
     selected = hours[hour_index] if hours else None
 
-    # Максимум для графика
     all_pv = [h.get("max_pv", 0) or 0 for h in hours]
     max_pv_day_scale = max(all_pv) if all_pv else 1.0
 
@@ -411,6 +539,7 @@ def forecast_table(model_key, station_key):
             events_by_time={},
             model_switcher=model_switcher,
             error=str(e),
+            is_point=False,
         )
 
     events_by_time = {}
@@ -437,6 +566,7 @@ def forecast_table(model_key, station_key):
         events_by_time=events_by_time,
         model_switcher=model_switcher,
         error=None,
+        is_point=False,
     )
 
 
@@ -453,20 +583,17 @@ def forecast_text(model_key, station_key):
     station_name = s["name"]
     model_name = MODELS[model_key]["name"]
 
-    # Параметр периода (по умолчанию 5 дней)
     try:
         days = int(request.args.get("days", 5))
     except (TypeError, ValueError):
         days = 5
     days = max(1, min(days, 7))
 
-    # Переключатель моделей
     model_switcher = [
         {"key": k, "name": v["name"], "active": (k == model_key)}
         for k, v in MODELS.items()
     ]
 
-    # Загрузка прогноза
     try:
         raw = fetch_forecast(model_key, lat, lon, days=days)
         forecast = parse_hourly(raw)
@@ -484,9 +611,9 @@ def forecast_text(model_key, station_key):
             days_options=[1, 3, 5, 7],
             text=f"Не удалось загрузить прогноз: {e}",
             error=str(e),
+            is_point=False,
         )
 
-    # Генерация текста
     try:
         text = generate_text_forecast(model_name, station_name, forecast)
     except Exception as e:
@@ -505,11 +632,12 @@ def forecast_text(model_key, station_key):
         days_options=[1, 3, 5, 7],
         text=text,
         error=None,
+        is_point=False,
     )
 
 
 # ------------------------------------------------------------------
-# График сравнения моделей (новый)
+# График сравнения моделей (станция)
 # ------------------------------------------------------------------
 @app.route("/chart/<station_key>")
 def chart_page(station_key):
@@ -521,12 +649,14 @@ def chart_page(station_key):
     lat, lon = s["lat"], s["lon"]
     station_name = s["name"]
 
-    # Параметры
     try:
         days = int(request.args.get("days", 5))
     except (TypeError, ValueError):
         days = 5
     days = max(2, min(days, 7))
+
+    step = request.args.get("step", type=int, default=1) or 1
+    step = max(1, min(step, 12))
 
     models_param = request.args.get("models", "")
     if models_param:
@@ -536,7 +666,6 @@ def chart_page(station_key):
     if not selected_models:
         selected_models = list(MODELS.keys())
 
-    # Toggle-модели: для каждой модели — список с ней/без неё
     toggle_models = {}
     for mk in MODELS:
         if mk in selected_models:
@@ -544,7 +673,6 @@ def chart_page(station_key):
         else:
             toggle_models[mk] = selected_models + [mk]
 
-    # Загрузка прогнозов
     series = []
     times_global = None
 
@@ -572,24 +700,19 @@ def chart_page(station_key):
             station_key=station_key,
             lat=lat, lon=lon,
             days=days,
+            step=step,
             days_options=[3, 5, 7],
             models=MODELS,
             selected_models=selected_models,
             toggle_models=toggle_models,
             model_colors=_MODEL_COLORS,
-            times=[],
-            times_labels=[],
-            days_list=[],
-            series=[],
-            fact_series=None,
-            svg_temps="",
-            svg_press="",
-            svg_winds="",
-            svg_prec="",
+            times=[], times_labels=[], days_list=[],
+            series=[], fact_series=None,
+            svg_temps="", svg_press="", svg_winds="", svg_prec="",
             error="Не удалось загрузить прогнозы. Попробуйте позже.",
+            is_point=False,
         )
 
-    # Собираем данные
     for model_key in selected_models:
         try:
             raw = fetch_forecast(model_key, lat, lon, days=days)
@@ -598,11 +721,7 @@ def chart_page(station_key):
             continue
 
         by_time = {h["time"]: h for h in forecast}
-
-        temps   = []
-        press   = []
-        winds   = []
-        precips = []
+        temps, press, winds, precips = [], [], [], []
 
         for t in times_global:
             h = by_time.get(t)
@@ -619,13 +738,10 @@ def chart_page(station_key):
             "key": model_key,
             "name": MODELS[model_key]["name"],
             "color": _MODEL_COLORS.get(model_key, "#888"),
-            "temps": temps,
-            "press": press,
-            "winds": winds,
-            "precips": precips,
+            "temps": temps, "press": press,
+            "winds": winds, "precips": precips,
         })
 
-    # Факт из ERA5 (опционально)
     fact_series = None
     try:
         today = date.today()
@@ -646,17 +762,13 @@ def chart_page(station_key):
 
             if any(v is not None for v in f_temps):
                 fact_series = {
-                    "name": "ERA5 (факт)",
-                    "color": _FACT_COLOR,
-                    "temps": f_temps,
-                    "press": f_press,
-                    "winds": f_winds,
-                    "precips": f_precips,
+                    "name": "ERA5 (факт)", "color": _FACT_COLOR,
+                    "temps": f_temps, "press": f_press,
+                    "winds": f_winds, "precips": f_precips,
                 }
     except Exception as e:
         log.warning("chart_page: ERA5 не загружен: %s", e)
 
-    # Разбивка по дням
     days_map = {}
     for i, t in enumerate(times_global):
         d = t[:10]
@@ -668,11 +780,14 @@ def chart_page(station_key):
     days_list = list(days_map.values())
     times_labels = [t[11:16] for t in times_global]
 
-    # Строим 4 SVG-графика
-    svg_temps = build_chart_svg(series, fact_series, "temps", "°C", "Температура", decimals=1)
-    svg_press = build_chart_svg(series, fact_series, "press", "гПа", "Давление", decimals=0)
-    svg_winds = build_chart_svg(series, fact_series, "winds", "м/с", "Ветер", decimals=0)
-    svg_prec  = build_chart_svg(series, fact_series, "precips", "мм", "Осадки", decimals=2)
+    svg_temps = build_chart_svg(series, fact_series, "temps", "°C", "Температура",
+                                decimals=1, times_labels=times_labels, step=step)
+    svg_press = build_chart_svg(series, fact_series, "press", "гПа", "Давление",
+                                decimals=0, times_labels=times_labels, step=step)
+    svg_winds = build_chart_svg(series, fact_series, "winds", "м/с", "Ветер",
+                                decimals=0, times_labels=times_labels, step=step)
+    svg_prec  = build_chart_svg(series, fact_series, "precips", "мм", "Осадки",
+                                decimals=2, times_labels=times_labels, step=step)
 
     return render_template_string(
         CHART_HTML,
@@ -680,6 +795,7 @@ def chart_page(station_key):
         station_key=station_key,
         lat=lat, lon=lon,
         days=days,
+        step=step,
         days_options=[3, 5, 7],
         models=MODELS,
         selected_models=selected_models,
@@ -695,6 +811,7 @@ def chart_page(station_key):
         svg_winds=svg_winds,
         svg_prec=svg_prec,
         error=None,
+        is_point=False,
     )
 
 
@@ -707,21 +824,554 @@ def compare_page(station_key):
     )
 
 
+# ------------------------------------------------------------------
+# Точка: таблица, текст, авиация, график
+# ------------------------------------------------------------------
 @app.route("/forecast/point")
 def forecast_point():
+    """Таблица прогноза для произвольной точки."""
     lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
     lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
     name = request.args.get("name", DEFAULT_LOCATION["name"])
     model_key = request.args.get("model", "gfs")
-    view = request.args.get("view", "table")
+    if model_key not in MODELS:
+        model_key = "gfs"
+
+    days = 5
+    model_name = MODELS[model_key]["name"]
+
+    model_switcher = [
+        {"key": k, "name": v["name"], "active": (k == model_key)}
+        for k, v in MODELS.items()
+    ]
+
+    try:
+        raw = fetch_forecast(model_key, lat, lon, days=days)
+        forecast = parse_hourly(raw)
+        by_day = prepare_forecast_for_render(forecast)
+        events = analyze_synoptic(forecast)
+    except Exception as e:
+        log.exception("forecast_point error: %s", e)
+        return render_template_string(
+            TABLE_TEMPLATE,
+            model=model_key,
+            model_name=model_name,
+            station=name,
+            station_key="point",
+            lat=lat, lon=lon, days=days,
+            days_list=[], events=[], events_by_time={},
+            model_switcher=model_switcher,
+            error=str(e),
+            is_point=True,
+        )
+
+    events_by_time = {}
+    for ev in events:
+        events_by_time.setdefault(ev["time"], []).append(ev)
+
+    days_list = []
+    for day, rows in by_day.items():
+        days_list.append({
+            "date": day,
+            "rows": rows,
+            "events": [ev for ev in events if ev["time"][:10] == day],
+        })
+
     return render_template_string(
-        POINT_TEMPLATE,
-        point_name=name,
-        lat=lat,
-        lon=lon,
+        TABLE_TEMPLATE,
         model=model_key,
-        model_name=MODELS.get(model_key, {}).get("name", model_key),
-        view=view,
+        model_name=model_name,
+        station=name,
+        station_key="point",
+        lat=lat, lon=lon, days=days,
+        days_list=days_list,
+        events=events,
+        events_by_time=events_by_time,
+        model_switcher=model_switcher,
+        error=None,
+        is_point=True,
+    )
+
+
+@app.route("/point-text")
+def point_text():
+    """Текстовый прогноз для произвольной точки."""
+    lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
+    lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
+    name = request.args.get("name", DEFAULT_LOCATION["name"])
+    model_key = request.args.get("model", "gfs")
+    if model_key not in MODELS:
+        model_key = "gfs"
+
+    try:
+        days = int(request.args.get("days", 5))
+    except (TypeError, ValueError):
+        days = 5
+    days = max(1, min(days, 7))
+
+    model_name = MODELS[model_key]["name"]
+
+    model_switcher = [
+        {"key": k, "name": v["name"], "active": (k == model_key)}
+        for k, v in MODELS.items()
+    ]
+
+    try:
+        raw = fetch_forecast(model_key, lat, lon, days=days)
+        forecast = parse_hourly(raw)
+        text = generate_text_forecast(model_name, name, forecast)
+    except Exception as e:
+        log.exception("point_text error: %s", e)
+        text = f"Не удалось сгенерировать прогноз: {e}"
+
+    return render_template_string(
+        TEXT_TEMPLATE,
+        model=model_key,
+        model_name=model_name,
+        station=name,
+        station_key="point",
+        lat=lat, lon=lon,
+        days=days,
+        model_switcher=model_switcher,
+        days_options=[1, 3, 5, 7],
+        text=text,
+        error=None,
+        is_point=True,
+    )
+
+
+@app.route("/point-aviation")
+def point_aviation():
+    """Авиационный прогноз для произвольной точки."""
+    lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
+    lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
+    name = request.args.get("name", DEFAULT_LOCATION["name"])
+    model_key = request.args.get("model", "gfs")
+    if model_key not in MODELS:
+        model_key = "gfs"
+
+    try:
+        days = int(request.args.get("days", 3))
+    except (TypeError, ValueError):
+        days = 3
+    days = max(1, min(days, 7))
+
+    model_name = MODELS[model_key]["name"]
+
+    model_switcher = [
+        {"key": k, "name": v["name"], "active": (k == model_key)}
+        for k, v in MODELS.items()
+    ]
+
+    try:
+        raw = fetch_forecast(model_key, lat, lon, days=days)
+        forecast = parse_hourly(raw)
+        by_day = prepare_forecast_for_render(forecast)
+    except Exception as e:
+        log.exception("point_aviation error: %s", e)
+        return render_template_string(
+            AVIATION_HTML,
+            model=model_key,
+            model_name=model_name,
+            station_name=name,
+            station_key="point",
+            lat=lat, lon=lon, days=days,
+            days_list=[],
+            model_switcher=model_switcher,
+            days_options=[1, 2, 3, 5, 7],
+            summary={},
+            error=str(e),
+            MODELS=MODELS,
+            is_point=True,
+        )
+
+    summary = {
+        "hours_total": 0,
+        "thunder_hours": 0,
+        "thunder_max_prob": 0,
+        "thunder_max_level": "нет",
+        "fog_hours": 0,
+        "fog_max_prob": 0,
+        "fog_max_level": "нет",
+        "k_max": None,
+        "li_min": None,
+        "cape_max": None,
+    }
+
+    for h in forecast:
+        summary["hours_total"] += 1
+
+        avt = h.get("av_thunder") or {}
+        if avt.get("combined_level") and avt["combined_level"] not in ("нет", "нет данных"):
+            summary["thunder_hours"] += 1
+        if avt.get("combined_prob") and avt["combined_prob"] > summary["thunder_max_prob"]:
+            summary["thunder_max_prob"] = avt["combined_prob"]
+            summary["thunder_max_level"] = avt.get("combined_level", "нет")
+
+        avf = h.get("av_fog") or {}
+        if avf.get("level") and avf["level"] not in ("нет", "нет данных"):
+            summary["fog_hours"] += 1
+        if avf.get("probability") and avf["probability"] > summary["fog_max_prob"]:
+            summary["fog_max_prob"] = avf["probability"]
+            summary["fog_max_level"] = avf.get("level", "нет")
+
+        if avt.get("k") is not None:
+            if summary["k_max"] is None or avt["k"] > summary["k_max"]:
+                summary["k_max"] = avt["k"]
+        if avt.get("li") is not None:
+            if summary["li_min"] is None or avt["li"] < summary["li_min"]:
+                summary["li_min"] = avt["li"]
+        if avt.get("cape") is not None:
+            if summary["cape_max"] is None or avt["cape"] > summary["cape_max"]:
+                summary["cape_max"] = avt["cape"]
+
+    days_list = []
+    for day, rows in by_day.items():
+        days_list.append({"date": day, "rows": rows})
+
+    return render_template_string(
+        AVIATION_HTML,
+        model=model_key,
+        model_name=model_name,
+        station_name=name,
+        station_key="point",
+        lat=lat, lon=lon, days=days,
+        days_list=days_list,
+        model_switcher=model_switcher,
+        days_options=[1, 2, 3, 5, 7],
+        summary=summary,
+        error=None,
+        MODELS=MODELS,
+        is_point=True,
+    )
+
+
+@app.route("/point-chart")
+def point_chart():
+    """Сравнение моделей на графике для произвольной точки."""
+    lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
+    lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
+    name = request.args.get("name", DEFAULT_LOCATION["name"])
+
+    try:
+        days = int(request.args.get("days", 5))
+    except (TypeError, ValueError):
+        days = 5
+    days = max(2, min(days, 7))
+
+    step = request.args.get("step", type=int, default=1) or 1
+    step = max(1, min(step, 12))
+
+    models_param = request.args.get("models", "")
+    if models_param:
+        selected_models = [m.strip() for m in models_param.split(",") if m.strip() in MODELS]
+    else:
+        selected_models = list(MODELS.keys())
+    if not selected_models:
+        selected_models = list(MODELS.keys())
+
+    toggle_models = {}
+    for mk in MODELS:
+        if mk in selected_models:
+            toggle_models[mk] = [m for m in selected_models if m != mk]
+        else:
+            toggle_models[mk] = selected_models + [mk]
+
+    series = []
+    times_global = None
+
+    for model_key in selected_models:
+        try:
+            raw = fetch_forecast(model_key, lat, lon, days=days)
+            forecast = parse_hourly(raw)
+        except Exception as e:
+            log.exception("point_chart: %s error: %s", model_key, e)
+            continue
+
+        if not forecast:
+            continue
+
+        model_times = [h["time"] for h in forecast]
+        if times_global is None:
+            times_global = model_times
+        else:
+            times_global = [t for t in times_global if t in model_times]
+
+    if times_global is None or not times_global:
+        return render_template_string(
+            CHART_HTML,
+            station_name=name,
+            station_key="point",
+            lat=lat, lon=lon,
+            days=days,
+            step=step,
+            days_options=[3, 5, 7],
+            models=MODELS,
+            selected_models=selected_models,
+            toggle_models=toggle_models,
+            model_colors=_MODEL_COLORS,
+            times=[], times_labels=[], days_list=[],
+            series=[], fact_series=None,
+            svg_temps="", svg_press="", svg_winds="", svg_prec="",
+            error="Не удалось загрузить прогнозы. Попробуйте позже.",
+            is_point=True,
+        )
+
+    for model_key in selected_models:
+        try:
+            raw = fetch_forecast(model_key, lat, lon, days=days)
+            forecast = parse_hourly(raw)
+        except Exception:
+            continue
+
+        by_time = {h["time"]: h for h in forecast}
+        temps, press, winds, precips = [], [], [], []
+
+        for t in times_global:
+            h = by_time.get(t)
+            if h is None:
+                temps.append(None); press.append(None)
+                winds.append(None); precips.append(None)
+            else:
+                temps.append(h.get("temp_c"))
+                press.append(h.get("pressure_hpa"))
+                winds.append(h.get("wind_ms"))
+                precips.append(h.get("precipitation_mm"))
+
+        series.append({
+            "key": model_key,
+            "name": MODELS[model_key]["name"],
+            "color": _MODEL_COLORS.get(model_key, "#888"),
+            "temps": temps, "press": press,
+            "winds": winds, "precips": precips,
+        })
+
+    fact_series = None
+    try:
+        today = date.today()
+        start = (today - timedelta(days=days)).isoformat()
+        end = (today - timedelta(days=1)).isoformat()
+        archive = fetch_archive(lat, lon, start, end)
+        if archive:
+            h = archive.get("hourly", {})
+            fact_times = dict(zip(h.get("time", []), h.get("temperature_2m", [])))
+            fact_press = dict(zip(h.get("time", []), h.get("pressure_msl", [])))
+            fact_wind  = dict(zip(h.get("time", []), h.get("wind_speed_10m", [])))
+            fact_prec  = dict(zip(h.get("time", []), h.get("precipitation", [])))
+
+            f_temps   = [fact_times.get(t) for t in times_global]
+            f_press   = [fact_press.get(t) for t in times_global]
+            f_winds   = [fact_wind.get(t) for t in times_global]
+            f_precips = [fact_prec.get(t) for t in times_global]
+
+            if any(v is not None for v in f_temps):
+                fact_series = {
+                    "name": "ERA5 (факт)", "color": _FACT_COLOR,
+                    "temps": f_temps, "press": f_press,
+                    "winds": f_winds, "precips": f_precips,
+                }
+    except Exception as e:
+        log.warning("point_chart: ERA5 не загружен: %s", e)
+
+    days_map = {}
+    for i, t in enumerate(times_global):
+        d = t[:10]
+        if d not in days_map:
+            days_map[d] = {"date": d, "start_idx": i, "end_idx": i}
+        else:
+            days_map[d]["end_idx"] = i
+
+    days_list = list(days_map.values())
+    times_labels = [t[11:16] for t in times_global]
+
+    svg_temps = build_chart_svg(series, fact_series, "temps", "°C", "Температура",
+                                decimals=1, times_labels=times_labels, step=step)
+    svg_press = build_chart_svg(series, fact_series, "press", "гПа", "Давление",
+                                decimals=0, times_labels=times_labels, step=step)
+    svg_winds = build_chart_svg(series, fact_series, "winds", "м/с", "Ветер",
+                                decimals=0, times_labels=times_labels, step=step)
+    svg_prec  = build_chart_svg(series, fact_series, "precips", "мм", "Осадки",
+                                decimals=2, times_labels=times_labels, step=step)
+
+    return render_template_string(
+        CHART_HTML,
+        station_name=name,
+        station_key="point",
+        lat=lat, lon=lon,
+        days=days,
+        step=step,
+        days_options=[3, 5, 7],
+        models=MODELS,
+        selected_models=selected_models,
+        toggle_models=toggle_models,
+        model_colors=_MODEL_COLORS,
+        times=times_global,
+        times_labels=times_labels,
+        days_list=days_list,
+        series=series,
+        fact_series=fact_series,
+        svg_temps=svg_temps,
+        svg_press=svg_press,
+        svg_winds=svg_winds,
+        svg_prec=svg_prec,
+        error=None,
+        is_point=True,
+    )
+
+
+# ------------------------------------------------------------------
+# СИНОПТИКА ПО УРОВНЯМ
+# ------------------------------------------------------------------
+@app.route("/synoptic/<model_key>/<station_key>")
+def synoptic_station(model_key, station_key):
+    """Синоптический анализ по уровням для станции."""
+    if model_key not in MODELS:
+        return "Модель не найдена", 404
+    if station_key not in STATIONS:
+        return "Станция не найдена", 404
+
+    s = STATIONS[station_key]
+    lat, lon = s["lat"], s["lon"]
+    station_name = s["name"]
+    model_name = MODELS[model_key]["name"]
+
+    try:
+        days = int(request.args.get("days", 3))
+    except (TypeError, ValueError):
+        days = 3
+    days = max(1, min(days, 5))
+
+    try:
+        hour_index = int(request.args.get("hour", 12))
+    except (TypeError, ValueError):
+        hour_index = 12
+    hour_index = max(0, min(hour_index, 23))
+
+    model_switcher = [
+        {"key": k, "name": v["name"], "active": (k == model_key)}
+        for k, v in MODELS.items()
+    ]
+
+    try:
+        raw = fetch_forecast(model_key, lat, lon, days=days)
+        forecast = parse_hourly(raw)
+        hours = extract_levels(forecast)
+        text = generate_synoptic_text(station_name, model_name, hours, hour_index=hour_index)
+        profile_svg = build_profile_svg(hours, hour_index)
+    except Exception as e:
+        log.exception("synoptic error: %s", e)
+        return render_template_string(
+            SYNOPTIC_HTML,
+            model=model_key,
+            model_name=model_name,
+            station_name=station_name,
+            station_key=station_key,
+            lat=lat, lon=lon,
+            days=days, hour_index=hour_index,
+            model_switcher=model_switcher,
+            days_options=[1, 3, 5],
+            hours_options=list(range(0, 24, 3)),
+            hours=[], text="", profile_svg="",
+            levels=SYNOPTIC_LEVELS,
+            level_names=LEVEL_NAMES,
+            error=str(e),
+            is_point=False,
+        )
+
+    return render_template_string(
+        SYNOPTIC_HTML,
+        model=model_key,
+        model_name=model_name,
+        station_name=station_name,
+        station_key=station_key,
+        lat=lat, lon=lon,
+        days=days, hour_index=hour_index,
+        model_switcher=model_switcher,
+        days_options=[1, 3, 5],
+        hours_options=list(range(0, 24, 3)),
+        hours=hours,
+        text=text,
+        profile_svg=profile_svg,
+        levels=SYNOPTIC_LEVELS,
+        level_names=LEVEL_NAMES,
+        error=None,
+        is_point=False,
+    )
+
+
+@app.route("/point-synoptic")
+def synoptic_point():
+    """Синоптический анализ по уровням для точки."""
+    lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
+    lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
+    name = request.args.get("name", DEFAULT_LOCATION["name"])
+    model_key = request.args.get("model", "gfs")
+    if model_key not in MODELS:
+        model_key = "gfs"
+
+    try:
+        days = int(request.args.get("days", 3))
+    except (TypeError, ValueError):
+        days = 3
+    days = max(1, min(days, 5))
+
+    try:
+        hour_index = int(request.args.get("hour", 12))
+    except (TypeError, ValueError):
+        hour_index = 12
+    hour_index = max(0, min(hour_index, 23))
+
+    model_name = MODELS[model_key]["name"]
+
+    model_switcher = [
+        {"key": k, "name": v["name"], "active": (k == model_key)}
+        for k, v in MODELS.items()
+    ]
+
+    try:
+        raw = fetch_forecast(model_key, lat, lon, days=days)
+        forecast = parse_hourly(raw)
+        hours = extract_levels(forecast)
+        text = generate_synoptic_text(name, model_name, hours, hour_index=hour_index)
+        profile_svg = build_profile_svg(hours, hour_index)
+    except Exception as e:
+        log.exception("synoptic point error: %s", e)
+        return render_template_string(
+            SYNOPTIC_HTML,
+            model=model_key,
+            model_name=model_name,
+            station_name=name,
+            station_key="point",
+            lat=lat, lon=lon,
+            days=days, hour_index=hour_index,
+            model_switcher=model_switcher,
+            days_options=[1, 3, 5],
+            hours_options=list(range(0, 24, 3)),
+            hours=[], text="", profile_svg="",
+            levels=SYNOPTIC_LEVELS,
+            level_names=LEVEL_NAMES,
+            error=str(e),
+            is_point=True,
+        )
+
+    return render_template_string(
+        SYNOPTIC_HTML,
+        model=model_key,
+        model_name=model_name,
+        station_name=name,
+        station_key="point",
+        lat=lat, lon=lon,
+        days=days, hour_index=hour_index,
+        model_switcher=model_switcher,
+        days_options=[1, 3, 5],
+        hours_options=list(range(0, 24, 3)),
+        hours=hours,
+        text=text,
+        profile_svg=profile_svg,
+        levels=SYNOPTIC_LEVELS,
+        level_names=LEVEL_NAMES,
+        error=None,
+        is_point=True,
     )
 
 
@@ -800,14 +1450,12 @@ def verify_history_page(station_key):
     lat, lon = s["lat"], s["lon"]
     station_name = s["name"]
 
-    # Период
     try:
         days = int(request.args.get("days", 14))
     except (TypeError, ValueError):
         days = 14
     days = max(3, min(days, 30))
 
-    # Собираем данные по каждой модели
     per_model = {}
     dates_union = []
 
@@ -833,14 +1481,12 @@ def verify_history_page(station_key):
             "error": None,
         }
 
-        # Собираем все даты (объединение)
         for d in model_days:
             if d["date"] not in dates_union:
                 dates_union.append(d["date"])
 
     dates_union.sort()
 
-    # Формируем series для графиков (по полю mae / bias / rmse)
     def build_series(field):
         out = []
         for mk, data in per_model.items():
@@ -858,7 +1504,7 @@ def verify_history_page(station_key):
                 "key": mk,
                 "name": data["model_name"],
                 "color": data["color"],
-                field: values,     # key = 'mae', 'bias', 'rmse'
+                field: values,
             })
         return out
 
@@ -866,12 +1512,10 @@ def verify_history_page(station_key):
     bias_series = build_series("bias")
     rmse_series = build_series("rmse")
 
-    # Строим SVG-графики через build_chart_svg
     svg_mae  = build_chart_svg(mae_series,  None, "mae",  "°C", "MAE по дням",  decimals=2)
     svg_bias = build_chart_svg(bias_series, None, "bias", "°C", "Bias по дням", decimals=2)
     svg_rmse = build_chart_svg(rmse_series, None, "rmse", "°C", "RMSE по дням", decimals=2)
 
-    # Таблица: строки = даты × модели
     table_rows = []
     for date in dates_union:
         for mk, data in per_model.items():
@@ -987,7 +1631,7 @@ def analyze_page(station_key):
 
 
 # ------------------------------------------------------------------
-# Авиация
+# Авиация (станция)
 # ------------------------------------------------------------------
 @app.route("/aviation/<model_key>/<station_key>")
 def aviation_page(model_key, station_key):
@@ -1032,6 +1676,7 @@ def aviation_page(model_key, station_key):
             summary={},
             error=str(e),
             MODELS=MODELS,
+            is_point=False,
         )
 
     summary = {
@@ -1091,6 +1736,7 @@ def aviation_page(model_key, station_key):
         summary=summary,
         error=None,
         MODELS=MODELS,
+        is_point=False,
     )
 
 
@@ -1200,14 +1846,12 @@ def compare_matrices_page(station_key):
     lat, lon = s["lat"], s["lon"]
     station_name = s["name"]
 
-    # Период
     try:
         days = int(request.args.get("days", 14))
     except (TypeError, ValueError):
         days = 14
     days = max(3, min(days, 30))
 
-    # Для каждого явления — compare_all_models
     results_per_phenomenon = {}
     for ph_key in PHENOMENA:
         try:
@@ -1217,7 +1861,6 @@ def compare_matrices_page(station_key):
             r = []
         results_per_phenomenon[ph_key] = r
 
-    # Сводная таблица: по каждому явлению — лучшая модель
     best_per_phenomenon = {}
     for ph_key, results in results_per_phenomenon.items():
         best = None
@@ -1247,11 +1890,47 @@ def compare_matrices_page(station_key):
 # ------------------------------------------------------------------
 @app.route("/api/geocode")
 def api_geocode():
-    q = request.args.get("q", "")
-    return jsonify({"results": [
-        {"name": q, "latitude": 55.75, "longitude": 37.62,
-         "admin1": "", "country": "Россия"}
-    ] if q else []})
+    """Реальный geocoding через Open-Meteo Geocoding API."""
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"results": []})
+
+    try:
+        count = int(request.args.get("count", 8))
+    except (TypeError, ValueError):
+        count = 8
+    count = max(1, min(count, 20))
+
+    try:
+        url = "https://geocoding-api.open-meteo.com/v1/search"
+        params = {
+            "name": q,
+            "count": count,
+            "language": "ru",
+            "format": "json",
+        }
+        r = _session.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        log.exception("geocode error: %s", e)
+        return jsonify({"results": [], "error": str(e)})
+
+    results = []
+    for item in data.get("results", []):
+        results.append({
+            "name": item.get("name", ""),
+            "latitude": item.get("latitude"),
+            "longitude": item.get("longitude"),
+            "country": item.get("country", ""),
+            "admin1": item.get("admin1", ""),
+            "admin2": item.get("admin2", ""),
+            "timezone": item.get("timezone", ""),
+            "population": item.get("population"),
+            "elevation": item.get("elevation"),
+        })
+
+    return jsonify({"results": results})
 
 
 @app.route("/api/verify/<station_key>")
