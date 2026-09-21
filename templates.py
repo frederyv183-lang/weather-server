@@ -178,7 +178,7 @@ BASE_STYLE = """
   .synoptic-fold         { background: rgba(255,84,112,0.15); color: #ff5470; border: 1px solid rgba(255,84,112,0.3); }
 
   .top-controls {
-    position: fixed; top: 16px; left: 16px; z-index: 9999;
+    position: fixed; top: 16px; right: 16px; z-index: 9999;
     display: flex; gap: 8px;
   }
   .top-controls > button {
