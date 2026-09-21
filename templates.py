@@ -3360,16 +3360,105 @@ COMPARE_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <a class="back" href="/analysis">← Анализ</a>
-<h1>Сводка явлений</h1>
+<h1>📋 Сводка явлений</h1>
+<div style="margin: 8px 0 16px 0;">
+  <a href="/compare/point" class="back" style="background:rgba(124,92,255,0.10);">🔍 Другая точка (поиск по названию)</a>
+</div>
 <div class="sub">{{ station_name }}</div>
-<p style="color:var(--text-1);font-size:14px;line-height:1.8;">
-Раздел в разработке.
-</p>
-""" + COMMON_JS + render_top_controls() + """
+<div class="legend">
+  {% for r in results %}
+    {% if not r.error %}
+      <div class="legend-item">
+        <span class="legend-dot" style="background:{{ r.color }};"></span>
+        <span>{{ r.model_name }}</span>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+{% if results %}
+<div style="overflow-x:auto;">
+<table class="summary-table">
+  <thead>
+    <tr>
+      <th>Модель</th>
+      {% for key, name, icon, _ in phenomena %}
+        <th>{{ icon }} {{ name }}</th>
+      {% endfor %}
+      <th>Часов всего</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in results %}
+      <tr>
+        <td class="model-name">
+          <span class="dot" style="background:{{ r.color }};"></span>
+          {{ r.model_name }}
+        </td>
+        {% if r.error %}
+          <td colspan="{{ phenomena|length + 1 }}" class="error-box">⚠️ {{ r.error }}</td>
+        {% else %}
+          {% for p in r.phenomena %}
+            {% set cls = 'zero' if p.hours == 0 else ('high' if p.percent >= 30 else ('med' if p.percent >= 10 else 'low')) %}
+            <td class="num {{ cls }}">
+              {{ p.hours }} ч
+              {% if p.hours > 0 %}
+                <span class="bar" style="width: {{ [p.percent * 2, 40]|min }}px;"></span>
+              {% endif %}
+            </td>
+          {% endfor %}
+          <td class="num">{{ r.phenomena[0].total }}</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% for key, name, icon, _ in phenomena %}
+  <div class="phenom-block">
+    <h2>{{ icon }} {{ name }}</h2>
+    <div class="phenom-grid">
+      {% for r in results %}
+        {% if r.error %}
+          <div class="phenom-card">
+            <div class="model-name">
+              <span class="dot" style="background:{{ r.color }};"></span>
+              {{ r.model_name }}
+            </div>
+            <div style="color:#ff5470;font-size:12px;">⚠️ {{ r.error }}</div>
+          </div>
+        {% else %}
+          {% set p = r.phenomena | selectattr("key", "equalto", key) | first %}
+          {% set cls = 'zero' if p.hours == 0 else ('high' if p.percent >= 30 else ('med' if p.percent >= 10 else 'low')) %}
+          <div class="phenom-card">
+            <div class="model-name">
+              <span class="dot" style="background:{{ r.color }};"></span>
+              {{ r.model_name }}
+            </div>
+            <div class="count {{ cls }}">{{ p.hours }} ч</div>
+            <div class="meta">{{ p.percent }} % от {{ p.total }} ч</div>
+            {% if p.hours > 0 %}
+              <div class="time-range">
+                с {{ p.first_time[11:16] }} {{ p.first_time[8:10] }}.{{ p.first_time[5:7] }}
+                по {{ p.last_time[11:16] }} {{ p.last_time[8:10] }}.{{ p.last_time[5:7] }}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+{% endfor %}
+
+{% else %}
+  <div class="empty-note">Нет данных для отображения.</div>
+{% endif %}
+
+""" + COMMON_JS + render_top_controls() + render_legend("analysis") + """
 </body>
 </html>
 """
-
 
 # ==================================================================
 # СТРАНИЦА МОДЕЛИ
@@ -7338,6 +7427,422 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+</script>
+
+""" + COMMON_JS + render_top_controls() + """
+</body>
+</html>
+"""
+# ==================================================================
+# СВОДКА ЯВЛЕНИЙ ДЛЯ ПРОИЗВОЛЬНОЙ ТОЧКИ
+# ==================================================================
+COMPARE_POINT_HTML = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сводка явлений — {% if station_name %}{{ station_name }}{% else %}Поиск точки{% endif %}</title>
+""" + BASE_STYLE + """
+<style>
+  .search-box {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; margin-bottom: 16px;
+    backdrop-filter: blur(14px);
+  }
+  .search-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    align-items: center; margin-bottom: 12px;
+  }
+  .search-row:last-child { margin-bottom: 0; }
+  .search-row label { color: var(--text-1); font-size: 13px; min-width: 110px; }
+  .search-row input {
+    padding: 10px 14px; background: var(--bg-1);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text-0); font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-row input:focus { border-color: var(--accent); }
+  .search-row input.q { flex: 1; min-width: 220px; }
+  .search-row input.coord {
+    width: 130px; font-family: 'JetBrains Mono', monospace;
+  }
+  .search-row button {
+    padding: 10px 22px; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #4dabff, #7c5cff);
+    color: #fff; cursor: pointer; font-size: 14px; font-weight: 600;
+    transition: opacity 0.2s;
+  }
+  .search-row button:hover { opacity: 0.9; }
+  .search-row button.secondary {
+    background: var(--bg-1); color: var(--text-0);
+    border: 1px solid var(--border);
+  }
+  .hint { font-size: 12px; color: var(--text-2); }
+
+  .results-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 12px; margin-top: 12px;
+  }
+  .result-card {
+    padding: 14px 18px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
+    border: 1px solid var(--border);
+    backdrop-filter: blur(14px);
+    transition: all 0.2s;
+  }
+  .result-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--card-shadow);
+  }
+  .result-card .place { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .result-card .meta {
+    color: var(--text-2); font-size: 12px; margin-bottom: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .result-card .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .result-card .actions a {
+    padding: 6px 12px; border-radius: 8px; text-decoration: none;
+    font-size: 12px; font-weight: 600;
+    background: rgba(77,171,255,0.10);
+    border: 1px solid rgba(77,171,255,0.3);
+    color: var(--accent);
+    transition: all 0.15s;
+  }
+  .result-card .actions a:hover {
+    background: rgba(77,171,255,0.20);
+    border-color: var(--border-hover);
+  }
+
+  .controls {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    margin: 16px 0 20px 0; padding: 14px 18px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 14px; backdrop-filter: blur(14px);
+  }
+  .controls label { color: var(--text-1); font-size: 13px; }
+  .controls a {
+    padding: 8px 14px; border-radius: 10px; font-size: 13px;
+    background: var(--bg-1); border: 1px solid var(--border);
+    color: var(--text-0); text-decoration: none; transition: all 0.2s;
+  }
+  .controls a:hover { border-color: var(--border-hover); }
+  .controls a.active {
+    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
+    border-color: var(--accent);
+  }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 12px 18px; margin-bottom: 16px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 14px; font-size: 13px;
+    backdrop-filter: blur(14px);
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+
+  .summary-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+    backdrop-filter: blur(14px);
+    margin-bottom: 24px;
+  }
+  .summary-table th {
+    text-align: left; padding: 12px 14px;
+    color: var(--text-2); font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15,21,36,0.4);
+  }
+  .summary-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(120,160,255,0.06);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .summary-table tr:hover td { background: rgba(77,171,255,0.05); }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table td.model-name {
+    font-family: 'Inter', sans-serif; font-weight: 600;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .summary-table td .dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  }
+  .summary-table td.num { font-weight: 700; }
+  .summary-table td.num.zero { color: var(--text-2); font-weight: 500; }
+  .summary-table td.num.low  { color: #00e5a0; }
+  .summary-table td.num.med  { color: #ffb547; }
+  .summary-table td.num.high { color: #ff5470; }
+
+  .bar {
+    display: inline-block; height: 6px; border-radius: 3px;
+    background: linear-gradient(90deg, #4dabff, #7c5cff);
+    vertical-align: middle; margin-left: 8px;
+  }
+
+  .phenom-block {
+    margin: 24px 0; padding: 20px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 16px; backdrop-filter: blur(14px);
+  }
+  .phenom-block h2 {
+    margin: 0 0 16px 0; font-size: 18px;
+    background: linear-gradient(135deg, var(--text-0), var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .phenom-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .phenom-card {
+    padding: 14px 16px; border-radius: 12px;
+    background: rgba(15,21,36,0.4);
+    border: 1px solid var(--border);
+  }
+  .phenom-card .model-name {
+    font-size: 13px; color: var(--text-0); font-weight: 600;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .phenom-card .model-name .dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  }
+  .phenom-card .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 700;
+  }
+  .phenom-card .count.zero { color: var(--text-2); }
+  .phenom-card .count.low  { color: #00e5a0; }
+  .phenom-card .count.med  { color: #ffb547; }
+  .phenom-card .count.high { color: #ff5470; }
+  .phenom-card .meta {
+    color: var(--text-2); font-size: 11px; margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .phenom-card .time-range {
+    color: var(--text-2); font-size: 11px; margin-top: 4px;
+  }
+
+  .error-box {
+    background: rgba(255,84,112,0.12);
+    border: 1px solid rgba(255,84,112,0.4);
+    border-radius: 12px; padding: 16px; color: #ff5470;
+    margin: 16px 0;
+  }
+  .empty-note { color: var(--text-2); padding: 20px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<a class="back" href="/analysis">← Анализ</a>
+<h1>📋 Сводка явлений</h1>
+<div class="sub">
+  {% if station_name %}
+    {{ station_name }} · {{ preset_lat }}, {{ preset_lon }} · прогноз на {{ days }} дней
+  {% else %}
+    Поиск любой точки: введите название или координаты
+  {% endif %}
+</div>
+
+<div class="search-box">
+  <div class="search-row">
+    <label>По названию:</label>
+    <input type="text" id="q" class="q"
+           placeholder="Москва, Домодедово, Лондон, Tokyo..."
+           value="{{ preset_name or '' }}"
+           onkeydown="if(event.key==='Enter') doSearch()">
+    <button onclick="doSearch()">🔍 Найти</button>
+  </div>
+
+  <div class="search-row">
+    <label>По координатам:</label>
+    <input type="text" id="lat" class="coord" placeholder="55.41"
+           value="{{ preset_lat or '' }}">
+    <input type="text" id="lon" class="coord" placeholder="37.90"
+           value="{{ preset_lon or '' }}">
+    <button onclick="doSearchCoords()" class="secondary">Перейти →</button>
+  </div>
+</div>
+
+<div id="results"></div>
+
+{% if results %}
+  <div class="controls">
+    <label>Период:</label>
+    {% for d in days_options %}
+      <a href="/compare/point?lat={{ preset_lat }}&lon={{ preset_lon }}&name={{ station_name }}&days={{ d }}"
+         class="{% if d == days %}active{% endif %}">{{ d }} дней</a>
+    {% endfor %}
+  </div>
+
+  <div class="legend">
+    {% for r in results %}
+      {% if not r.error %}
+        <div class="legend-item">
+          <span class="legend-dot" style="background:{{ r.color }};"></span>
+          <span>{{ r.model_name }}</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <div style="overflow-x:auto;">
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Модель</th>
+        {% for key, name, icon, _ in phenomena %}
+          <th>{{ icon }} {{ name }}</th>
+        {% endfor %}
+        <th>Часов всего</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+        <tr>
+          <td class="model-name">
+            <span class="dot" style="background:{{ r.color }};"></span>
+            {{ r.model_name }}
+          </td>
+          {% if r.error %}
+            <td colspan="{{ phenomena|length + 1 }}" class="error-box">⚠️ {{ r.error }}</td>
+          {% else %}
+            {% for p in r.phenomena %}
+              {% set cls = 'zero' if p.hours == 0 else ('high' if p.percent >= 30 else ('med' if p.percent >= 10 else 'low')) %}
+              <td class="num {{ cls }}">
+                {{ p.hours }} ч
+                {% if p.hours > 0 %}
+                  <span class="bar" style="width: {{ [p.percent * 2, 40]|min }}px;"></span>
+                {% endif %}
+              </td>
+            {% endfor %}
+            <td class="num">{{ r.phenomena[0].total }}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% for key, name, icon, _ in phenomena %}
+    <div class="phenom-block">
+      <h2>{{ icon }} {{ name }}</h2>
+      <div class="phenom-grid">
+        {% for r in results %}
+          {% if r.error %}
+            <div class="phenom-card">
+              <div class="model-name">
+                <span class="dot" style="background:{{ r.color }};"></span>
+                {{ r.model_name }}
+              </div>
+              <div style="color:#ff5470;font-size:12px;">⚠️ {{ r.error }}</div>
+            </div>
+          {% else %}
+            {% set p = r.phenomena | selectattr("key", "equalto", key) | first %}
+            {% set cls = 'zero' if p.hours == 0 else ('high' if p.percent >= 30 else ('med' if p.percent >= 10 else 'low')) %}
+            <div class="phenom-card">
+              <div class="model-name">
+                <span class="dot" style="background:{{ r.color }};"></span>
+                {{ r.model_name }}
+              </div>
+              <div class="count {{ cls }}">{{ p.hours }} ч</div>
+              <div class="meta">{{ p.percent }} % от {{ p.total }} ч</div>
+              {% if p.hours > 0 %}
+                <div class="time-range">
+                  с {{ p.first_time[11:16] }} {{ p.first_time[8:10] }}.{{ p.first_time[5:7] }}
+                  по {{ p.last_time[11:16] }} {{ p.last_time[8:10] }}.{{ p.last_time[5:7] }}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<script>
+  function actionsHtml(name, lat, lon) {
+    var encName = encodeURIComponent(name);
+    return ''
+      + '<div class="actions">'
+      + '  <a href="/compare/point?lat=' + lat + '&lon=' + lon + '&name=' + encName + '">📋 Сводка явлений</a>'
+      + '  <a href="/forecast/point?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=gfs">📊 Таблица</a>'
+      + '  <a href="/point-synoptic?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=gfs">🌡 Синоптика</a>'
+      + '</div>';
+  }
+
+  async function doSearch() {
+    var q = document.getElementById('q').value.trim();
+    if (!q) return;
+    var results = document.getElementById('results');
+
+    var coordMatch = q.match(/^(-?\\d+\\.?\\d*)[\\s,]+(-?\\d+\\.?\\d*)$/);
+    if (coordMatch) {
+      var lat = parseFloat(coordMatch[1]);
+      var lon = parseFloat(coordMatch[2]);
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        var name = lat + ', ' + lon;
+        var encName = encodeURIComponent(name);
+        window.location.href = '/compare/point?lat=' + lat + '&lon=' + lon + '&name=' + encName;
+        return;
+      }
+    }
+
+    results.innerHTML = '<div style="color:var(--accent);padding:20px;text-align:center;">⏳ Поиск...</div>';
+
+    try {
+      var resp = await fetch('/api/geocode?q=' + encodeURIComponent(q));
+      var data = await resp.json();
+
+      if (data.error) {
+        results.innerHTML = '<div class="error-box">Ошибка: ' + data.error + '</div>';
+        return;
+      }
+      if (!data.results || data.results.length === 0) {
+        results.innerHTML = '<div class="empty-note">Ничего не найдено. Попробуйте другое название или введите координаты.</div>';
+        return;
+      }
+
+      var html = '<div class="results-grid">';
+      data.results.forEach(function(p) {
+        var label = [p.name, p.admin1, p.country].filter(Boolean).join(', ');
+        var meta = '';
+        if (p.latitude !== undefined && p.longitude !== undefined) {
+          meta += p.latitude.toFixed(3) + ', ' + p.longitude.toFixed(3);
+        }
+        if (p.elevation !== undefined && p.elevation !== null) {
+          meta += ' · ' + p.elevation + ' м';
+        }
+        if (p.population) {
+          meta += ' · ' + p.population.toLocaleString('ru-RU') + ' чел.';
+        }
+
+        html += '<div class="result-card">'
+              + '<div class="place">📍 ' + p.name + '</div>'
+              + '<div class="meta">' + meta + '</div>'
+              + actionsHtml(label, p.latitude, p.longitude)
+              + '</div>';
+      });
+      html += '</div>';
+      results.innerHTML = html;
+    } catch (err) {
+      results.innerHTML = '<div class="error-box">Ошибка: ' + err.message + '</div>';
+    }
+  }
+
+  function doSearchCoords() {
+    var lat = parseFloat(document.getElementById('lat').value);
+    var lon = parseFloat(document.getElementById('lon').value);
+    if (isNaN(lat) || isNaN(lon)) { alert('Введите корректные координаты'); return; }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      alert('Широта: -90…90, долгота: -180…180');
+      return;
+    }
+    var name = lat + ', ' + lon;
+    var encName = encodeURIComponent(name);
+    window.location.href = '/compare/point?lat=' + lat + '&lon=' + lon + '&name=' + encName;
+  }
 </script>
 
 """ + COMMON_JS + render_top_controls() + """

@@ -17,6 +17,7 @@ from templates import (
     TROPOPAUSE_HTML, TEACHING_HTML,
     VERIFY_HTML, VERIFY_HISTORY_HTML, ANALYZE_HTML,
     AVIATION_HTML, ALT_VERIFY_HTML, COMPARE_MATRICES_HTML,
+    COMPARE_POINT_HTML,
     CHART_HTML, COMPARE_HTML, MODEL_HTML,
     TABLE_TEMPLATE, TEXT_TEMPLATE, SEARCH_HTML, POINT_TEMPLATE,
     SYNOPTIC_HTML,
@@ -822,7 +823,102 @@ def compare_page(station_key):
         station_name=STATIONS.get(station_key, {}).get("name", station_key),
         days=5,
     )
+@app.route("/compare/point")
+def compare_point():
+    """Сводка явлений для произвольной точки (по координатам или названию)."""
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    name = request.args.get("name", "").strip()
 
+    # Если координаты не переданы — показываем только форму поиска
+    if lat is None or lon is None:
+        return render_template_string(
+            COMPARE_POINT_HTML,
+            models=MODELS,
+            preset_lat=None,
+            preset_lon=None,
+            preset_name=name,
+            results=None,
+            phenomena=None,
+            error=None,
+            days=5,
+            days_options=[3, 5, 7],
+            station_key="point",
+            station_name=None,
+        )
+
+    if not name:
+        name = f"{lat:.4f}, {lon:.4f}"
+
+    try:
+        days = int(request.args.get("days", 5))
+    except (TypeError, ValueError):
+        days = 5
+    days = max(1, min(days, 7))
+
+    # Явления — те же, что в compare_page
+    PHENOMENA_LIST = [
+        ("fog",     "Туман",         "🌫", lambda h: h.get("weather_code") in (45, 48)),
+        ("thunder", "Гроза",         "⚡", lambda h: h.get("weather_code") in (95, 96, 99)),
+        ("rain",    "Осадки",        "🌧", lambda h: (h.get("precipitation_mm") or 0) > 0.05),
+        ("snow",    "Снег",          "❄️", lambda h: h.get("weather_code") in (71, 73, 75, 77, 85, 86)),
+        ("frost",   "Заморозок",     "🥶", lambda h: h.get("temp_c") is not None and h.get("temp_c") < 0),
+        ("wind",    "Сильный ветер", "💨", lambda h: (h.get("wind_ms") or 0) >= 12.0),
+    ]
+
+    results = []
+    for model_key in MODELS:
+        row = {
+            "model_key": model_key,
+            "model_name": MODELS[model_key]["name"],
+            "color": _MODEL_COLORS.get(model_key, "#888"),
+            "error": None,
+            "phenomena": [],
+        }
+
+        try:
+            raw = fetch_forecast(model_key, lat, lon, days=days)
+            forecast = parse_hourly(raw)
+        except Exception as e:
+            log.exception("compare_point: %s error: %s", model_key, e)
+            row["error"] = str(e)
+            results.append(row)
+            continue
+
+        for key, ph_name, icon, test in PHENOMENA_LIST:
+            hit_hours = [h for h in forecast if test(h)]
+            hours_count = len(hit_hours)
+            total_hours = len(forecast)
+            percent = round(100.0 * hours_count / total_hours, 1) if total_hours else 0
+
+            times = [h["time"] for h in hit_hours]
+            row["phenomena"].append({
+                "key": key,
+                "name": ph_name,
+                "icon": icon,
+                "hours": hours_count,
+                "total": total_hours,
+                "percent": percent,
+                "first_time": times[0] if times else None,
+                "last_time": times[-1] if times else None,
+            })
+
+        results.append(row)
+
+    return render_template_string(
+        COMPARE_POINT_HTML,
+        models=MODELS,
+        preset_lat=lat,
+        preset_lon=lon,
+        preset_name=name,
+        results=results,
+        phenomena=PHENOMENA_LIST,
+        error=None,
+        days=days,
+        days_options=[3, 5, 7],
+        station_key="point",
+        station_name=name,
+    )
 
 # ------------------------------------------------------------------
 # Точка: таблица, текст, авиация, график
