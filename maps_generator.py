@@ -28,6 +28,7 @@ import bz2
 import shutil
 import tempfile
 import urllib.request
+import urllib.error
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -100,8 +101,13 @@ GFS_PRODUCT = "pgrb2.0p25"
 # ICON-EU
 # ============================================================
 def get_icon_run():
-    """Ближайший доступный run ICON-EU (00/06/12/18 UTC, с задержкой 2 ч)."""
-    now = datetime.now(timezone.utc) - timedelta(hours=2)
+    """Ближайший гарантированно доступный run ICON-EU.
+
+    00/06/12/18 UTC, задержка 6 ч: DWD публикует полный набор
+    GRIB-файлов в течение 3–4 часов после выпуска, плюс кэш CDN.
+    6 часов — безопасный запас, всегда берём предыдущий срок.
+    """
+    now = datetime.now(timezone.utc) - timedelta(hours=6)
     hour = (now.hour // 6) * 6
     return now.replace(hour=hour, minute=0, second=0, microsecond=0)
 
@@ -118,11 +124,23 @@ def download_icon_field(run, field, step):
     url = f"{ICON_BASE}/{hh}/{field}/{fname}.bz2"
     out = os.path.join(CACHE_DIR, fname)
 
-    if not os.path.exists(out):
-        with urllib.request.urlopen(url, timeout=60) as r:
-            data = bz2.decompress(r.read())
+    need_download = (
+        not os.path.exists(out) or os.path.getsize(out) < 10240
+    )
+
+    if need_download:
+        if os.path.exists(out):
+            os.remove(out)
+        print(f"[maps] downloading {url}", flush=True)
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                data = bz2.decompress(r.read())
+        except urllib.error.HTTPError as e:
+            print(f"[maps] HTTP {e.code} for {url}", flush=True)
+            raise
         with open(out, "wb") as f:
             f.write(data)
+        print(f"[maps] saved {out} ({len(data)} bytes)", flush=True)
 
     return out
 
@@ -158,10 +176,26 @@ GFS_FIELDS = {
 
 
 def get_gfs_run():
-    """Ближайший доступный run GFS (00/06/12/18 UTC, с задержкой 3 ч)."""
-    now = datetime.now(timezone.utc) - timedelta(hours=3)
+    """Ближайший гарантированно доступный run GFS.
+
+    NOMADS публикует полный набор GRIB в течение ~4 часов после выпуска.
+    Берём 6 часов — безопасный запас.
+    """
+    now = datetime.now(timezone.utc) - timedelta(hours=6)
     hour = (now.hour // 6) * 6
     return now.replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
+def _pick_first_dataset(ds):
+    """
+    Herbie иногда возвращает список xarray.Dataset (несколько гиперкубов).
+    Для наших целей берём первый — там лежит основное поле.
+    """
+    if isinstance(ds, list):
+        if not ds:
+            raise RuntimeError("Herbie вернул пустой список датасетов")
+        return ds[0]
+    return ds
 
 
 def read_gfs_field(run, field, step):
@@ -175,6 +209,10 @@ def read_gfs_field(run, field, step):
         fxx=step,
     )
     ds = H.xarray(GFS_FIELDS[field])
+
+    # Herbie может вернуть список датасетов (несколько гиперкубов)
+    ds = _pick_first_dataset(ds)
+
     var = list(ds.data_vars)[0]
 
     if float(ds.latitude[0]) > float(ds.latitude[-1]):
@@ -328,7 +366,6 @@ def _save_layer_both(data, lons, lats, layer_type, model, stamp, step, field,
     Сохраняет слой в архив + дублирует в корень static/maps/.
     Возвращает (archive_path, root_path).
     """
-    # Архив: static/maps/archive/YYYY/MM/DD/
     year, month, day = stamp[:4], stamp[4:6], stamp[6:8]
     archive_dir = os.path.join(ARCHIVE_DIR, year, month, day)
     os.makedirs(archive_dir, exist_ok=True)
