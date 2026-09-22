@@ -5,3 +5,12 @@ python-dotenv
 gunicorn
 pandas
 numpy
+apscheduler
+earthkit-data
+earthkit-plots
+xarray
+cfgrib
+eccodes
+cartopy
+matplotlib
+scipy
