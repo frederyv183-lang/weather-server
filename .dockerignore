@@ -1,8 +1,24 @@
 __pycache__
 *.pyc
 *.pyo
+*.pyd
 .git
 .gitignore
 .env
 *.md
-Текстовый документ.txt
+.venv
+venv
+env
+ENV
+*.log
+.cache
+.pytest_cache
+.mypy_cache
+.ipynb_checkpoints
+static/maps/*
+!static/maps/.gitkeep
+cache/
+*.grib2
+*.grib
+*.bz2
+stats/

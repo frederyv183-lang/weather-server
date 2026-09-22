@@ -50,6 +50,8 @@ from analysis.aviation_verify import compare_all_models
 # --- модули для тропопаузы ---
 from data.tropopause_data import fetch_pressure_level_data
 from analysis.tropopause import analyze_day
+# --- карты погоды (ICON-EU + GFS, Leaflet) ---
+from maps_routes import maps_bp
 
 # ------------------------------------------------------------------
 # Логирование
@@ -76,6 +78,7 @@ def date_ru_filter(iso_date):
     except Exception:
         return str(iso_date)
 
+app.register_blueprint(maps_bp)
 
 @app.template_filter("absval")
 def absval_filter(value):

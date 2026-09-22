@@ -14,3 +14,4 @@ eccodes
 cartopy
 matplotlib
 scipy
+herbie-data
