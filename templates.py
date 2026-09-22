@@ -568,7 +568,7 @@ FORECAST_HUB_HTML = """<!DOCTYPE html>
   <div class="desc">Профиль T, θ, RH на 925–300 гПа · тропопауза · струя · фронты · LI, K-Index</div>
 </a>
 
-<a class="card fade-in" href="/map" style="animation-delay: 0.30s">
+<a class="card fade-in" href="/maps" style="animation-delay: 0.30s">
   <span class="icon">🗺</span><b>Карта + спутник + радар</b>
   <div class="desc">OSM · спутник · RainViewer · облачность · поиск · клик по точке</div>
 </a>
@@ -794,7 +794,7 @@ INDEX_HTML = """<!DOCTYPE html>
   <div class="desc">Авиационные прогнозы, матрицы Хандожко, критерии успешности, складки тропопаузы</div>
 </a>
 
-<a class="card fade-in" href="/map" style="animation-delay: 0.20s;background:rgba(124,92,255,0.10);">
+<a class="card fade-in" href="/maps" style="animation-delay: 0.20s;background:rgba(124,92,255,0.10);">
   <span class="icon">🗺</span><b>Карта + спутник + радар</b>
   <div class="desc">OSM · спутник · RainViewer · поиск · клик по точке</div>
 </a>
@@ -7991,6 +7991,8 @@ MAPS_HTML = r"""<!DOCTYPE html>
 <body>
 
 <a class="back" href="/forecast">← Прогноз</a>
+<a class="back" href="/forecast">← Прогноз</a>
+<a class="back" href="/map" style="margin-left:8px;">🗺 Простая карта (OSM/спутник)</a>
 <h1>🗺 Карта погоды</h1>
 <div class="sub">OSM · спутник · интерактивные слои ICON-EU / GFS · поиск региона</div>
 
