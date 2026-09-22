@@ -7209,22 +7209,30 @@ MAPS_HTML = r"""<!DOCTYPE html>
     overflow: hidden;
     background: var(--bg-0);
   }
-  .panel {
-    position: absolute;
-    top: 80px;
-    right: 20px;
-    z-index: 1000;
-    width: 280px;
-    padding: 16px 18px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    backdrop-filter: blur(14px);
-    box-shadow: var(--card-shadow);
-    font-size: 13px;
-    max-height: calc(78vh - 100px);
-    overflow-y: auto;
-  }
+.maps-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .maps-layout { grid-template-columns: 1fr; }
+}
+
+.panel {
+  position: sticky;
+  top: 20px;
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(14px);
+  box-shadow: var(--card-shadow);
+  font-size: 13px;
+  max-height: calc(78vh);
+  overflow-y: auto;
+}
   .panel h3 {
     margin: 12px 0 6px 0;
     font-size: 12px;
@@ -7337,51 +7345,72 @@ MAPS_HTML = r"""<!DOCTYPE html>
   <button id="btn-sat" onclick="setBase('sat')">🛰 Спутник</button>
 </div>
 
-<div id="map"></div>
-
-<div class="panel">
-  <h3>Поиск региона</h3>
-  <input type="text" id="search-box"
-         placeholder="Москва, Тверь, Казань..."
-         style="width:100%;padding:8px 10px;background:var(--bg-1);
-                border:1px solid var(--border);border-radius:8px;
-                color:var(--text-0);font-size:13px;outline:none;">
-  <ul id="search-results"
-      style="list-style:none;padding:0;margin:6px 0 0 0;
-             max-height:140px;overflow-y:auto;font-size:12px;"></ul>
-
-  <a class="back" href="/archive"
-     style="display:block;width:100%;text-align:center;margin:12px 0 0 0;">
-    📂 Все прогоны → архив
-  </a>
-
-  <h3>Модель</h3>
-  <select id="model-select">
-    <option value="icon-eu">ICON-EU (DWD)</option>
-    <option value="gfs">GFS (NOAA)</option>
-  </select>
-
-  <h3>Шаг прогноза</h3>
-  <select id="step-select">
-    <option value="6">+6 ч</option>
-    <option value="12" selected>+12 ч</option>
-    <option value="18">+18 ч</option>
-    <option value="24">+24 ч</option>
-  </select>
-
-  <h3>Слои</h3>
-  <label><input type="checkbox" id="layer-t2m" checked> 🌡 Температура 2м</label>
-  <label><input type="checkbox" id="layer-pmsl" checked> 📊 Давление (Pmsl)</label>
-  <label><input type="checkbox" id="layer-wind" checked> 💨 Ветер 10м</label>
-  <label><input type="checkbox" id="layer-prec"> 🌧 Осадки</label>
-  <label><input type="checkbox" id="layer-clct"> ☁️ Облачность</label>
-
-  <div class="btn-row">
-    <button onclick="updateMaps()">Обновить</button>
-    <button class="secondary" onclick="generateMaps()">⚙ Генерировать</button>
+<div class="maps-layout">
+  <div class="map-wrapper" style="position: relative;">
+    <div id="map"></div>
+    <div id="map-timestamp" style="
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      z-index: 1000;
+      padding: 6px 12px;
+      background: rgba(15, 21, 36, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-0);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+      display: none;
+    "></div>
   </div>
-  <div id="status"></div>
-</div>
+
+    <div class="panel">
+    <h3>Поиск региона</h3>
+    <input type="text" id="search-box"
+           placeholder="Москва, Тверь, Казань..."
+           style="width:100%;padding:8px 10px;background:var(--bg-1);
+                  border:1px solid var(--border);border-radius:8px;
+                  color:var(--text-0);font-size:13px;outline:none;">
+    <ul id="search-results"
+        style="list-style:none;padding:0;margin:6px 0 0 0;
+               max-height:140px;overflow-y:auto;font-size:12px;"></ul>
+
+    <a class="back" href="/archive"
+       style="display:block;width:100%;text-align:center;margin:12px 0 0 0;">
+      📂 Все прогоны → архив
+    </a>
+
+    <h3>Модель</h3>
+    <select id="model-select">
+      <option value="icon-eu">ICON-EU (DWD)</option>
+      <option value="gfs">GFS (NOAA)</option>
+    </select>
+
+    <h3>Шаг прогноза</h3>
+    <select id="step-select">
+      <option value="6">+6 ч</option>
+      <option value="12" selected>+12 ч</option>
+      <option value="18">+18 ч</option>
+      <option value="24">+24 ч</option>
+    </select>
+
+    <h3>Слои</h3>
+    <label><input type="checkbox" id="layer-t2m" checked> 🌡 Температура 2м</label>
+    <label><input type="checkbox" id="layer-pmsl" checked> 📊 Давление (Pmsl)</label>
+    <label><input type="checkbox" id="layer-wind" checked> 💨 Ветер 10м</label>
+    <label><input type="checkbox" id="layer-prec"> 🌧 Осадки</label>
+    <label><input type="checkbox" id="layer-clct"> ☁️ Облачность</label>
+
+    <div class="btn-row">
+      <button onclick="updateMaps()">Обновить</button>
+      <button class="secondary" onclick="generateMaps()">⚙ Генерировать</button>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>          <!-- ← закрываем .maps-layout -->
+
 
 <script>
 // ============================================================
@@ -7475,10 +7504,13 @@ function updateMaps() {
 
   status.textContent = 'Поиск данных...';
 
-findStamp(model, step, function(stamp) {
+  findStamp(model, step, function(stamp) {
+    var tsEl = document.getElementById('map-timestamp');
+
     if (!stamp) {
       status.textContent = 'Нет данных для ' + model + ' +' + step + 'ч. Нажмите «Генерировать» или выберите архив.';
       ['t2m', 'pmsl', 'wind', 'prec', 'clct'].forEach(removeLayer);
+      if (tsEl) tsEl.style.display = 'none';
       return;
     }
     activeStamp = stamp;
@@ -7498,6 +7530,12 @@ findStamp(model, step, function(stamp) {
 
     var dt = stamp.slice(0, 8) + ' ' + stamp.slice(8, 10) + ':00 UTC';
     status.textContent = '✓ ' + model + ' · ' + step + 'ч · ' + dt;
+
+    // Таймкод карты
+    if (tsEl) {
+      tsEl.textContent = '🕒 ' + model.toUpperCase() + ' · +' + step + 'ч · ' + dt;
+      tsEl.style.display = 'block';
+    }
   });
 }
 
