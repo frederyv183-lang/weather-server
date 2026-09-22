@@ -127,6 +127,68 @@ def api_maps_archive_files():
         "base_url": f"/static/maps/archive/{year}/{month}/{day}/",
     })
 
+# ==================================================================
+# АРХИВ ПРОГОНОВ — СТРАНИЦА
+# ==================================================================
+@maps_bp.route("/archive")
+def archive_page():
+    """Отдельная страница со списком архивных прогонов и картой."""
+    from templates import ARCHIVE_HTML
+    meta = get_meta()
+    return render_template_string(ARCHIVE_HTML, meta=meta)
+
+
+@maps_bp.route("/archive/<stamp>")
+def archive_run(stamp):
+    """Конкретный архивный прогон."""
+    from templates import ARCHIVE_HTML
+    meta = get_meta()
+    return render_template_string(ARCHIVE_HTML, meta=meta)
+
+
+# ==================================================================
+# СКАЧИВАНИЕ ZIP-ОМ
+# ==================================================================
+@maps_bp.route("/api/maps-archive-zip/<stamp>")
+def api_archive_zip(stamp):
+    """Упаковка всех PNG одного прогона в ZIP."""
+    import io
+    import zipfile
+    from flask import send_file
+
+    parts = stamp.split("_")
+    if len(parts) < 2 or len(parts[1]) < 10:
+        return jsonify({"error": "bad stamp"}), 400
+
+    model = parts[0]
+    date_str = parts[1]
+    year, month, day = date_str[:4], date_str[4:6], date_str[6:8]
+
+    archive_dir = os.path.join(ARCHIVE_DIR, year, month, day)
+    if not os.path.isdir(archive_dir):
+        return jsonify({"error": "no archive"}), 404
+
+    prefix = f"{model}_{date_str}_"
+    files = [f for f in os.listdir(archive_dir)
+             if f.startswith(prefix) and f.endswith(".png")]
+
+    if not files:
+        return jsonify({"error": "no files"}), 404
+
+    # Собираем ZIP в памяти
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname in sorted(files):
+            fpath = os.path.join(archive_dir, fname)
+            zf.write(fpath, arcname=fname)
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{stamp}.zip",
+    )
 
 @maps_bp.route("/api/update-maps", methods=["POST"])
 def api_update_maps():

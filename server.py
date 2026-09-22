@@ -61,6 +61,9 @@ logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
+# === Планировщик карт (фоновое обновление) ===
+from scheduler import init_scheduler
+init_scheduler(app)
 
 # ------------------------------------------------------------------
 # Jinja-фильтры

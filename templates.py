@@ -798,7 +798,10 @@ INDEX_HTML = """<!DOCTYPE html>
   <span class="icon">🗺</span><b>Карта + спутник + радар</b>
   <div class="desc">OSM · спутник · RainViewer · поиск · клик по точке</div>
 </a>
-
+<a class="card fade-in" href="/archive" style="animation-delay: 0.22s;background:rgba(0,229,160,0.10);">
+  <span class="icon">📂</span><b>Архив карт</b>
+  <div class="desc">Все прогоны ICON-EU и GFS за 90 дней · скачивание PNG и ZIP</div>
+</a>
 <a class="card fade-in" href="/about" style="animation-delay: 0.25s">
   <span class="icon">ℹ️</span><b>О проекте</b>
   <div class="desc">Источники данных, модели, метрики, библиография</div>
@@ -5139,1048 +5142,6 @@ ALT_VERIFY_HTML = """<!DOCTYPE html>
 
 
 # ==================================================================
-# ТЕКСТОВЫЙ ПРОГНОЗ
-# ==================================================================
-TEXT_TEMPLATE = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ station }} — текст — {{ model_name }}</title>
-""" + BASE_STYLE + """
-<style>
-  .model-switcher {
-    display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap;
-  }
-  .model-switcher a {
-    padding: 8px 16px; border-radius: 10px; text-decoration: none;
-    font-size: 13px; font-weight: 600; transition: all 0.2s;
-    background: var(--card-bg); border: 1px solid var(--border);
-    color: var(--text-1);
-  }
-  .model-switcher a:hover { border-color: var(--border-hover); }
-  .model-switcher a.active {
-    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
-    border-color: var(--accent); color: var(--text-0);
-  }
-
-  .controls {
-    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
-    margin: 16px 0 20px 0; padding: 14px 18px;
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 14px; backdrop-filter: blur(14px);
-  }
-  .controls label { color: var(--text-1); font-size: 13px; }
-  .controls a {
-    padding: 8px 14px; border-radius: 10px; font-size: 13px;
-    background: var(--bg-1); border: 1px solid var(--border);
-    color: var(--text-0); text-decoration: none; transition: all 0.2s;
-  }
-  .controls a:hover { border-color: var(--border-hover); }
-  .controls a.active {
-    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
-    border-color: var(--accent);
-  }
-
-  .text-block {
-    padding: 24px 28px; border-radius: 16px;
-    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
-    border: 1px solid var(--border); backdrop-filter: blur(14px);
-    margin: 20px 0;
-  }
-  .text-block pre {
-    white-space: pre-wrap; word-wrap: break-word;
-    font-family: 'Inter', -apple-system, sans-serif;
-    font-size: 15px; line-height: 1.85; margin: 0;
-    color: var(--text-0);
-  }
-
-  .action-row {
-    display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px;
-  }
-  .action-row a {
-    padding: 10px 20px; border-radius: 12px; text-decoration: none;
-    font-size: 13px; font-weight: 600; transition: all 0.2s;
-    background: rgba(77,171,255,0.10); border: 1px solid rgba(77,171,255,0.3);
-    color: var(--accent);
-  }
-  .action-row a:hover {
-    background: rgba(77,171,255,0.20);
-    border-color: var(--border-hover);
-  }
-
-  .error-box {
-    background: rgba(255,84,112,0.12);
-    border: 1px solid rgba(255,84,112,0.4);
-    border-radius: 12px; padding: 16px; color: #ff5470;
-    margin: 16px 0;
-  }
-</style>
-</head>
-<body>
-
-<a class="back" href="{% if is_point %}/forecast/point?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}{% else %}/forecast/{{ model }}/{{ station_key }}{% endif %}">
-  ← Таблица
-</a>
-<h1>📝 {{ station }}</h1>
-<div class="sub">{{ model_name }} · текстовый прогноз на {{ days }} дн.</div>
-
-{% if error %}
-  <div class="error-box">⚠️ {{ error }}</div>
-{% endif %}
-
-<div class="model-switcher">
-  {% for m in model_switcher %}
-    <a href="{% if is_point %}/point-text?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ m.key }}{% else %}/text/{{ m.key }}/{{ station_key }}?days={{ days }}{% endif %}"
-       class="{% if m.active %}active{% endif %}">{{ m.name }}</a>
-  {% endfor %}
-</div>
-
-<div class="controls">
-  <label>Период:</label>
-  {% for d in days_options %}
-    <a href="{% if is_point %}/point-text?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}&days={{ d }}{% else %}/text/{{ model }}/{{ station_key }}?days={{ d }}{% endif %}"
-       class="{% if d == days %}active{% endif %}">{{ d }} дн.</a>
-  {% endfor %}
-</div>
-
-<div class="text-block">
-  <pre>{{ text }}</pre>
-</div>
-
-<div class="action-row">
-  <a href="{% if is_point %}/forecast/point?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}{% else %}/forecast/{{ model }}/{{ station_key }}{% endif %}">📊 Таблица</a>
-  <a href="{% if is_point %}/point-chart?lat={{ lat }}&lon={{ lon }}&name={{ station }}&days={{ days }}{% else %}/chart/{{ station_key }}?days={{ days }}{% endif %}">📈 График</a>
-  <a href="{% if is_point %}/point-aviation?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}&days={{ days }}{% else %}/aviation/{{ model }}/{{ station_key }}?days={{ days }}{% endif %}">✈️ Авиация</a>
-  <a href="{% if is_point %}/point-synoptic?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}&days={{ days }}{% else %}/synoptic/{{ model }}/{{ station_key }}?days={{ days }}{% endif %}">🌡 Синоптика</a>
-</div>
-
-""" + COMMON_JS + render_top_controls() + render_legend("forecast") + """
-</body>
-</html>
-"""
-
-
-# ==================================================================
-# ПОИСК ТОЧКИ
-# ==================================================================
-SEARCH_HTML = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Поиск точки — weather-msk</title>
-""" + BASE_STYLE + """
-<style>
-  .search-box {
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px; margin-bottom: 16px;
-    backdrop-filter: blur(14px);
-  }
-  .search-row {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    align-items: center; margin-bottom: 12px;
-  }
-  .search-row:last-child { margin-bottom: 0; }
-  .search-row label { color: var(--text-1); font-size: 13px; min-width: 110px; }
-  .search-row input, .search-row select {
-    padding: 10px 14px; background: var(--bg-1);
-    border: 1px solid var(--border); border-radius: 10px;
-    color: var(--text-0); font-size: 14px; outline: none;
-    transition: border-color 0.2s;
-  }
-  .search-row input:focus, .search-row select:focus {
-    border-color: var(--accent);
-  }
-  .search-row input.q {
-    flex: 1; min-width: 220px;
-  }
-  .search-row input.coord {
-    width: 130px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .search-row button {
-    padding: 10px 22px; border: none; border-radius: 10px;
-    background: linear-gradient(135deg, #4dabff, #7c5cff);
-    color: #fff; cursor: pointer; font-size: 14px; font-weight: 600;
-    transition: opacity 0.2s;
-  }
-  .search-row button:hover { opacity: 0.9; }
-  .search-row button.secondary {
-    background: var(--bg-1); color: var(--text-0);
-    border: 1px solid var(--border);
-  }
-
-  .hint {
-    font-size: 12px; color: var(--text-2); margin-top: 4px;
-  }
-
-  .results-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 12px; margin-top: 12px;
-  }
-  .result-card {
-    padding: 14px 18px; border-radius: 14px;
-    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
-    border: 1px solid var(--border);
-    transition: all 0.2s;
-    backdrop-filter: blur(14px);
-  }
-  .result-card:hover {
-    border-color: var(--border-hover);
-    box-shadow: var(--card-shadow);
-  }
-  .result-card .place {
-    font-size: 16px; font-weight: 700; margin-bottom: 4px;
-  }
-  .result-card .meta {
-    color: var(--text-2); font-size: 12px; margin-bottom: 10px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .result-card .actions {
-    display: flex; gap: 6px; flex-wrap: wrap;
-  }
-  .result-card .actions a {
-    padding: 6px 12px; border-radius: 8px; text-decoration: none;
-    font-size: 12px; font-weight: 600;
-    background: rgba(77,171,255,0.10);
-    border: 1px solid rgba(77,171,255,0.3);
-    color: var(--accent);
-    transition: all 0.15s;
-  }
-  .result-card .actions a:hover {
-    background: rgba(77,171,255,0.20);
-    border-color: var(--border-hover);
-  }
-
-  .loader {
-    color: var(--accent); padding: 20px; text-align: center;
-    font-size: 14px;
-  }
-  .empty {
-    color: var(--text-2); padding: 20px; text-align: center;
-    font-size: 14px;
-  }
-  .error-box {
-    background: rgba(255,84,112,0.12);
-    border: 1px solid rgba(255,84,112,0.4);
-    border-radius: 12px; padding: 16px; color: #ff5470;
-    margin: 16px 0;
-  }
-</style>
-</head>
-<body>
-
-<a class="back" href="/forecast">← Прогноз</a>
-<h1>🔍 Поиск точки</h1>
-<div class="sub">Введите название населённого пункта или координаты, затем выберите, что показать</div>
-
-<div class="search-box">
-  <div class="search-row">
-    <label>По названию:</label>
-    <input type="text" id="q" class="q"
-           placeholder="Москва, Домодедово, Лондон, Tokyo..."
-           value="{{ preset_name or '' }}"
-           onkeydown="if(event.key==='Enter') doSearch()">
-    <button onclick="doSearch()">🔍 Найти</button>
-  </div>
-
-  <div class="search-row">
-    <label>По координатам:</label>
-    <input type="text" id="lat" class="coord" placeholder="55.41"
-           value="{{ preset_lat or '' }}">
-    <input type="text" id="lon" class="coord" placeholder="37.90"
-           value="{{ preset_lon or '' }}">
-    <button onclick="doSearchCoords()" class="secondary">Перейти →</button>
-  </div>
-
-  <div class="search-row">
-    <label>Модель:</label>
-    <select id="model">
-      {% for key, m in models.items() %}
-        <option value="{{ key }}">{{ m.name }}</option>
-      {% endfor %}
-    </select>
-    <span class="hint">Какие данные показывать — таблица или текст</span>
-  </div>
-</div>
-
-<div id="results"></div>
-
-<script>
-  function actionsHtml(name, lat, lon, model) {
-    var encName = encodeURIComponent(name);
-    return ''
-      + '<div class="actions">'
-      + '  <a href="/forecast/point?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=' + model + '">📊 Таблица</a>'
-      + '  <a href="/point-text?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=' + model + '">📝 Текст</a>'
-      + '  <a href="/point-aviation?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=' + model + '">✈️ Авиация</a>'
-      + '  <a href="/point-chart?lat=' + lat + '&lon=' + lon + '&name=' + encName + '">📈 График</a>'
-      + '  <a href="/point-synoptic?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=' + model + '">🌡 Синоптика</a>'
-      + '</div>';
-  }
-
-  async function doSearch() {
-    var q = document.getElementById('q').value.trim();
-    if (!q) return;
-    var model = document.getElementById('model').value;
-    var results = document.getElementById('results');
-
-    var coordMatch = q.match(/^(-?\\d+\\.?\\d*)[\\s,]+(-?\\d+\\.?\\d*)$/);
-    if (coordMatch) {
-      var lat = parseFloat(coordMatch[1]);
-      var lon = parseFloat(coordMatch[2]);
-      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-        var name = lat + ', ' + lon;
-        var encName = encodeURIComponent(name);
-        window.location.href = '/forecast/point?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=' + model;
-        return;
-      }
-    }
-
-    results.innerHTML = '<div class="loader">⏳ Поиск...</div>';
-
-    try {
-      var resp = await fetch('/api/geocode?q=' + encodeURIComponent(q));
-      var data = await resp.json();
-
-      if (data.error) {
-        results.innerHTML = '<div class="error-box">Ошибка: ' + data.error + '</div>';
-        return;
-      }
-
-      if (!data.results || data.results.length === 0) {
-        results.innerHTML = '<div class="empty">Ничего не найдено. Попробуйте другое название или введите координаты.</div>';
-        return;
-      }
-
-      var html = '<div class="results-grid">';
-      data.results.forEach(function(p) {
-        var label = [p.name, p.admin1, p.country].filter(Boolean).join(', ');
-        var meta = '';
-        if (p.latitude !== undefined && p.longitude !== undefined) {
-          meta += p.latitude.toFixed(3) + ', ' + p.longitude.toFixed(3);
-        }
-        if (p.elevation !== undefined && p.elevation !== null) {
-          meta += ' · ' + p.elevation + ' м';
-        }
-        if (p.population) {
-          meta += ' · ' + p.population.toLocaleString('ru-RU') + ' чел.';
-        }
-        if (p.timezone) {
-          meta += ' · ' + p.timezone;
-        }
-
-        html += '<div class="result-card">'
-              + '<div class="place">📍 ' + p.name + '</div>'
-              + '<div class="meta">' + meta + '</div>'
-              + actionsHtml(label, p.latitude, p.longitude, model)
-              + '</div>';
-      });
-      html += '</div>';
-      results.innerHTML = html;
-    } catch (err) {
-      results.innerHTML = '<div class="error-box">Ошибка: ' + err.message + '</div>';
-    }
-  }
-
-  function doSearchCoords() {
-    var lat = parseFloat(document.getElementById('lat').value);
-    var lon = parseFloat(document.getElementById('lon').value);
-    var model = document.getElementById('model').value;
-    if (isNaN(lat) || isNaN(lon)) {
-      alert('Введите корректные координаты');
-      return;
-    }
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      alert('Широта: -90…90, долгота: -180…180');
-      return;
-    }
-    var name = lat + ', ' + lon;
-    var encName = encodeURIComponent(name);
-    window.location.href = '/forecast/point?lat=' + lat + '&lon=' + lon + '&name=' + encName + '&model=' + model;
-  }
-</script>
-
-""" + COMMON_JS + render_top_controls() + """
-</body>
-</html>
-"""
-
-
-# ==================================================================
-# ШАБЛОН ТОЧКИ (заглушка)
-# ==================================================================
-POINT_TEMPLATE = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Прогноз — {{ point_name }}</title>
-""" + BASE_STYLE + """
-</head>
-<body>
-<a class="back" href="/search">← Поиск</a>
-<h1>{{ point_name }}</h1>
-<div class="sub">{{ lat }}, {{ lon }} · модель: {{ model_name }}</div>
-<p style="color:var(--text-1);font-size:14px;line-height:1.8;">
-Раздел в разработке.
-</p>
-""" + COMMON_JS + render_top_controls() + """
-</body>
-</html>
-"""
-
-
-# ==================================================================
-# СИНОПТИКА ПО УРОВНЯМ
-# ==================================================================
-SYNOPTIC_HTML = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Синоптика — {{ station_name }} — {{ model_name }}</title>
-""" + BASE_STYLE + """
-<style>
-  .model-switcher {
-    display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap;
-  }
-  .model-switcher a {
-    padding: 8px 16px; border-radius: 10px; text-decoration: none;
-    font-size: 13px; font-weight: 600; transition: all 0.2s;
-    background: var(--card-bg); border: 1px solid var(--border);
-    color: var(--text-1);
-  }
-  .model-switcher a:hover { border-color: var(--border-hover); }
-  .model-switcher a.active {
-    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
-    border-color: var(--accent); color: var(--text-0);
-  }
-
-  .controls {
-    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
-    margin: 16px 0 20px 0; padding: 14px 18px;
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 14px; backdrop-filter: blur(14px);
-  }
-  .controls label { color: var(--text-1); font-size: 13px; }
-  .controls a {
-    padding: 8px 14px; border-radius: 10px; font-size: 13px;
-    background: var(--bg-1); border: 1px solid var(--border);
-    color: var(--text-0); text-decoration: none; transition: all 0.2s;
-  }
-  .controls a:hover { border-color: var(--border-hover); }
-  .controls a.active {
-    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
-    border-color: var(--accent);
-  }
-
-  .synoptic-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-    margin: 20px 0;
-  }
-  @media (max-width: 900px) {
-    .synoptic-grid { grid-template-columns: 1fr; }
-  }
-
-  .section {
-    padding: 20px; background: var(--card-bg);
-    border: 1px solid var(--border); border-radius: 16px;
-    backdrop-filter: blur(14px);
-  }
-  .section h2 {
-    margin: 0 0 16px 0; font-size: 18px;
-    background: linear-gradient(135deg, var(--text-0), var(--accent));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  }
-
-  .profile-wrap {
-    background: rgba(15,21,36,0.4);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px;
-  }
-
-  .text-block {
-    white-space: pre-wrap; word-wrap: break-word;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; line-height: 1.7;
-    color: var(--text-1);
-    background: rgba(15,21,36,0.4);
-    padding: 16px; border-radius: 12px;
-    border: 1px solid var(--border);
-    max-height: 600px; overflow-y: auto;
-  }
-
-  .levels-table {
-    width: 100%; border-collapse: collapse;
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    margin-top: 12px;
-  }
-  .levels-table th {
-    text-align: left; padding: 8px 10px; color: var(--text-2);
-    font-weight: 600; font-size: 11px; text-transform: uppercase;
-    border-bottom: 1px solid var(--border);
-  }
-  .levels-table td {
-    padding: 8px 10px;
-    border-bottom: 1px solid rgba(120,160,255,0.06);
-  }
-  .levels-table tr:hover td { background: rgba(77,171,255,0.05); }
-  .levels-table td.num { font-weight: 600; }
-  .levels-table td.num.good { color: #00e5a0; }
-  .levels-table td.num.warn { color: #ffb547; }
-  .levels-table td.num.bad  { color: #ff5470; }
-
-  .badge {
-    display: inline-block; padding: 3px 10px; border-radius: 6px;
-    font-size: 11px; font-weight: 600; margin: 2px 4px 2px 0;
-  }
-  .badge-jet    { background: rgba(124,92,255,0.15); color: #a78bfa;
-                  border: 1px solid rgba(124,92,255,0.35); }
-  .badge-front  { background: rgba(255,84,112,0.15); color: #ff5470;
-                  border: 1px solid rgba(255,84,112,0.35); }
-  .badge-calm   { background: rgba(0,229,160,0.10); color: #00e5a0;
-                  border: 1px solid rgba(0,229,160,0.3); }
-
-  #synoptic-tooltip {
-    position: fixed;
-    pointer-events: none;
-    z-index: 10000;
-    background: var(--bg-0);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--text-0);
-    box-shadow: 0 12px 30px rgba(0,0,0,0.45);
-    display: none;
-    white-space: nowrap;
-    line-height: 1.6;
-  }
-  #synoptic-tooltip .tt-title {
-    font-family: 'Inter', sans-serif;
-    font-weight: 700;
-    font-size: 13px;
-    margin-bottom: 6px;
-    color: #ff5470;
-  }
-  #synoptic-tooltip .tt-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  #synoptic-tooltip .tt-row span:first-child {
-    color: var(--text-2);
-  }
-  #synoptic-tooltip .tt-row span:last-child {
-    font-weight: 600;
-  }
-
-  .error-box {
-    background: rgba(255,84,112,0.12);
-    border: 1px solid rgba(255,84,112,0.4);
-    border-radius: 12px; padding: 16px; color: #ff5470;
-    margin: 16px 0;
-  }
-  .empty-note { color: var(--text-2); padding: 20px; font-size: 14px; }
-</style>
-</head>
-<body>
-
-<a class="back" href="{% if is_point %}/search{% else %}/forecast{% endif %}">
-  ← {% if is_point %}Поиск{% else %}Прогноз{% endif %}
-</a>
-<h1>🌡 Синоптика по уровням</h1>
-<div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ model_name }} · {{ days }} дн.</div>
-
-{% if error %}
-  <div class="error-box">⚠️ {{ error }}</div>
-{% endif %}
-
-<div class="model-switcher">
-  {% for m in model_switcher %}
-    <a href="{% if is_point %}/point-synoptic?lat={{ lat }}&lon={{ lon }}&name={{ station_name }}&model={{ m.key }}&days={{ days }}&hour={{ hour_index }}{% else %}/synoptic/{{ m.key }}/{{ station_key }}?days={{ days }}&hour={{ hour_index }}{% endif %}"
-       class="{% if m.active %}active{% endif %}">{{ m.name }}</a>
-  {% endfor %}
-</div>
-
-<div class="controls">
-  <label>Период:</label>
-  {% for d in days_options %}
-    <a href="{% if is_point %}/point-synoptic?lat={{ lat }}&lon={{ lon }}&name={{ station_name }}&model={{ model }}&days={{ d }}&hour={{ hour_index }}{% else %}/synoptic/{{ model }}/{{ station_key }}?days={{ d }}&hour={{ hour_index }}{% endif %}"
-       class="{% if d == days %}active{% endif %}">{{ d }} дн.</a>
-  {% endfor %}
-</div>
-
-<div class="controls">
-  <label>Час для профиля:</label>
-  {% for h in hours_options %}
-    <a href="{% if is_point %}/point-synoptic?lat={{ lat }}&lon={{ lon }}&name={{ station_name }}&model={{ model }}&days={{ days }}&hour={{ h }}{% else %}/synoptic/{{ model }}/{{ station_key }}?days={{ days }}&hour={{ h }}{% endif %}"
-       class="{% if h == hour_index %}active{% endif %}">{{ '%02d'|format(h) }}:00</a>
-  {% endfor %}
-</div>
-
-{% if hours %}
-<div class="synoptic-grid">
-  <div class="section">
-    <h2>📈 Профиль T и θ ({{ '%02d'|format(hour_index) }}:00)</h2>
-    <div class="profile-wrap">
-      {{ profile_svg | safe }}
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>📋 Текстовый разбор</h2>
-    <div class="text-block">{{ text }}</div>
-  </div>
-</div>
-
-<div class="section" style="margin-top:20px;">
-  <h2>🔍 Данные по уровням ({{ '%02d'|format(hour_index) }}:00)</h2>
-  {% set h = hours[hour_index] if hour_index < hours|length else hours[0] %}
-  <div style="margin-bottom:12px;">
-    {% if h.jet %}
-      <span class="badge badge-jet">💨 Струя: {{ h.jet.speed }} м/с на 300 гПа ({{ h.jet.dir }}°)</span>
-    {% else %}
-      <span class="badge badge-calm">💨 Струя: нет</span>
-    {% endif %}
-    {% if h.frontal_zone %}
-      <span class="badge badge-front">⚠️ Фронтальная зона{% if h.front_type %} ({{ h.front_type }}){% endif %}</span>
-    {% else %}
-      <span class="badge badge-calm">✓ Фронт: нет</span>
-    {% endif %}
-    {% if h.tropopause_hPa %}
-      <span class="badge badge-jet">🌀 Тропопауза: {{ h.tropopause_hPa }} гПа{% if h.tropopause_type %} ({{ h.tropopause_type }}){% endif %}</span>
-    {% else %}
-      <span class="badge badge-calm">🌀 Тропопауза: не обнаружена</span>
-    {% endif %}
-  </div>
-  <div style="overflow-x:auto;">
-  <table class="levels-table">
-    <thead>
-      <tr>
-        <th>Уровень</th>
-        <th>H, м</th>
-        <th>T, °C</th>
-        <th>Td, °C</th>
-        <th>θ, K</th>
-        <th>RH, %</th>
-        <th>mr, г/кг</th>
-        <th>Ветер, м/с</th>
-        <th>Напр.</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for lvl in levels %}
-        {% set d = h.levels[lvl] if h.levels and lvl in h.levels else {} %}
-        <tr>
-          <td><b>{{ level_names[lvl] }}</b></td>
-          <td class="num">{{ '%.0f'|format(d.height_m) if d.height_m is not none else '—' }}</td>
-          <td class="num {% if d.t is not none and d.t < -50 %}bad{% elif d.t is not none and d.t < 0 %}warn{% else %}good{% endif %}">
-            {{ '%.1f'|format(d.t) if d.t is not none else '—' }}
-          </td>
-          <td class="num">{{ '%.1f'|format(d.td) if d.td is not none else '—' }}</td>
-          <td class="num">{{ '%.1f'|format(d.theta) if d.theta is not none else '—' }}</td>
-          <td class="num {% if d.rh is not none and d.rh > 90 %}warn{% endif %}">
-            {{ '%.0f'|format(d.rh) if d.rh is not none else '—' }}
-          </td>
-          <td class="num">{{ '%.1f'|format(d.mr) if d.mr is not none else '—' }}</td>
-          <td class="num {% if d.wind_ms is not none and d.wind_ms > 30 %}bad{% elif d.wind_ms is not none and d.wind_ms > 15 %}warn{% endif %}">
-            {{ '%.0f'|format(d.wind_ms) if d.wind_ms is not none else '—' }}
-          </td>
-          <td class="num">{{ '%.0f'|format(d.wind_dir) if d.wind_dir is not none else '—' }}°</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-</div>
-
-<div class="section" style="margin-top:20px;">
-  <h2>📊 Индексы неустойчивости ({{ '%02d'|format(hour_index) }}:00)</h2>
-  {% set h2 = hours[hour_index] if hour_index < hours|length else hours[0] %}
-  <table class="levels-table">
-    <tbody>
-      <tr>
-        <td><b>Lifted Index (LI)</b></td>
-        <td class="num {% if h2.indices.li is not none and h2.indices.li < -4 %}bad{% elif h2.indices.li is not none and h2.indices.li < 0 %}warn{% else %}good{% endif %}">
-          {{ '%.1f'|format(h2.indices.li) if h2.indices.li is not none else '—' }}
-        </td>
-        <td>LI &lt; 0 — неустойчиво, LI &lt; −4 — сильная неустойчивость</td>
-      </tr>
-      <tr>
-        <td><b>K-Index</b></td>
-        <td class="num {% if h2.indices.k_index is not none and h2.indices.k_index > 35 %}bad{% elif h2.indices.k_index is not none and h2.indices.k_index > 25 %}warn{% else %}good{% endif %}">
-          {{ '%.1f'|format(h2.indices.k_index) if h2.indices.k_index is not none else '—' }}
-        </td>
-        <td>K &gt; 25 — возможны грозы, K &gt; 35 — сильные грозы</td>
-      </tr>
-      <tr>
-        <td><b>ΔT (850−500)</b></td>
-        <td class="num">{{ '%.1f'|format(h2.indices.dt_850_500) if h2.indices.dt_850_500 is not none else '—' }} °C</td>
-        <td>Грубый индикатор конвекции</td>
-      </tr>
-      <tr>
-        <td><b>Сдвиг ветра 850→300</b></td>
-        <td class="num">
-          {% if h2.shear %}{{ '%.1f'|format(h2.shear[0]) }} м/с{% else %}—{% endif %}
-        </td>
-        <td>{% if h2.shear %}направление {{ '%.0f'|format(h2.shear[1]) }}°{% else %}—{% endif %}</td>
-      </tr>
-      <tr>
-        <td><b>Адвекция (850 гПа)</b></td>
-        <td class="num">
-          {% if h2.advection == 'warm' %}<span style="color:#ffb547;">тёплая</span>
-          {% elif h2.advection == 'cold' %}<span style="color:#4dabff;">холодная</span>
-          {% else %}—{% endif %}
-        </td>
-        <td>Перенос тепла/холода ветром</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
-{% else %}
-  <div class="empty-note">Нет данных для отображения.</div>
-{% endif %}
-
-<div id="synoptic-tooltip"></div>
-
-<script>
-(function() {
-  var tt = document.getElementById('synoptic-tooltip');
-  if (!tt) return;
-
-  function buildHtml(el) {
-    var lvl     = el.getAttribute('data-level') || '';
-    var time    = el.getAttribute('data-time') || '';
-    var t       = el.getAttribute('data-t');
-    var td      = el.getAttribute('data-td');
-    var theta   = el.getAttribute('data-theta');
-    var wind    = el.getAttribute('data-wind');
-    var wdir    = el.getAttribute('data-winddir');
-    var rh      = el.getAttribute('data-rh');
-    var mr      = el.getAttribute('data-mr');
-    var height  = el.getAttribute('data-height');
-
-    var html = '<div class="tt-title">' + lvl + ' гПа · ' + time + '</div>';
-    if (t && t !== '—')         html += '<div class="tt-row"><span>T</span><span style="color:#ff5470;">' + t + ' °C</span></div>';
-    if (td && td !== '—')       html += '<div class="tt-row"><span>Td</span><span style="color:#6bb6ff;">' + td + ' °C</span></div>';
-    if (theta && theta !== '—') html += '<div class="tt-row"><span>θ</span><span style="color:#4dabff;">' + theta + ' K</span></div>';
-    if (height && height !== '—') html += '<div class="tt-row"><span>H</span><span>' + height + ' м</span></div>';
-    if (wind && wind !== '—') {
-      var windStr = wind + ' м/с';
-      if (wdir && wdir !== '—') windStr += ' · ' + wdir + '°';
-      html += '<div class="tt-row"><span>Ветер</span><span style="color:#a78bfa;">' + windStr + '</span></div>';
-    }
-    if (rh && rh !== '—')       html += '<div class="tt-row"><span>RH</span><span>' + rh + ' %</span></div>';
-    if (mr && mr !== '—')       html += '<div class="tt-row"><span>mr</span><span>' + mr + ' г/кг</span></div>';
-    return html;
-  }
-
-  document.addEventListener('mouseover', function(e) {
-    var el = e.target;
-    if (!el || el.tagName !== 'circle') return;
-    var lvl = el.getAttribute('data-level');
-    if (!lvl) return;
-    tt.innerHTML = buildHtml(el);
-    tt.style.display = 'block';
-  });
-
-  document.addEventListener('mousemove', function(e) {
-    if (tt.style.display !== 'block') return;
-    var pad = 14;
-    var x = e.clientX + pad;
-    var y = e.clientY + pad;
-    if (x + tt.offsetWidth > window.innerWidth)  x = e.clientX - tt.offsetWidth - pad;
-    if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - pad;
-    tt.style.left = x + 'px';
-    tt.style.top  = y + 'px';
-  });
-
-  document.addEventListener('mouseout', function(e) {
-    if (e.target && e.target.tagName === 'circle') {
-      tt.style.display = 'none';
-    }
-  });
-
-  document.addEventListener('touchstart', function(e) {
-    if (e.target && e.target.tagName === 'circle' && e.target.getAttribute('data-level')) {
-      tt.innerHTML = buildHtml(e.target);
-      tt.style.display = 'block';
-      tt.style.left = (e.touches[0].clientX + 14) + 'px';
-      tt.style.top  = (e.touches[0].clientY + 14) + 'px';
-    } else {
-      tt.style.display = 'none';
-    }
-  }, { passive: true });
-})();
-</script>
-
-""" + render_biblio_ref("synoptic", "гл. 3–4") + """
-""" + COMMON_JS + render_top_controls() + render_legend("synoptic") + """
-</body>
-</html>
-"""
-
-
-# ==================================================================
-# КЛИМАТИЧЕСКИЕ ИНДЕКСЫ
-# ==================================================================
-CLIMATE_HTML = """<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Климатические индексы — ENSO / SSW / PV</title>
-""" + BASE_STYLE + """
-<style>
-  .section {
-    margin: 24px 0; padding: 20px;
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 16px; backdrop-filter: blur(14px);
-  }
-  .section h2 {
-    margin: 0 0 16px 0; font-size: 18px;
-    background: linear-gradient(135deg, var(--text-0), var(--accent));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  }
-  .kpi-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px; margin: 16px 0 20px 0;
-  }
-  .kpi {
-    padding: 14px 18px; border-radius: 14px;
-    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
-    border: 1px solid var(--border);
-  }
-  .kpi .lbl {
-    color: var(--text-2); font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  .kpi .val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 20px; font-weight: 700; margin-top: 6px;
-  }
-  .kpi .val.good { color: #00e5a0; }
-  .kpi .val.warn { color: #ffb547; }
-  .kpi .val.bad  { color: #ff5470; }
-  .kpi .sub {
-    color: var(--text-2); font-size: 11px; margin-top: 4px;
-  }
-  .summary-box {
-    margin: 12px 0 20px 0; padding: 14px 18px;
-    background: rgba(15,21,36,0.5);
-    border: 1px solid var(--border); border-radius: 12px;
-    font-size: 14px; line-height: 1.6; color: var(--text-1);
-  }
-  .chart-block {
-    margin: 16px 0; padding: 12px;
-    background: rgba(15,21,36,0.4);
-    border: 1px solid var(--border); border-radius: 12px;
-  }
-  .chart-block svg { display: block; }
-  .events-list {
-    margin-top: 12px; padding: 0; list-style: none;
-  }
-  .events-list li {
-    padding: 8px 12px; margin-bottom: 6px;
-    background: rgba(15,21,36,0.4);
-    border-left: 3px solid #ff5470;
-    border-radius: 6px;
-    font-size: 13px; color: var(--text-1);
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .events-list li .date { color: #ffb547; font-weight: 700; }
-  .error-box {
-    background: rgba(255,84,112,0.12);
-    border: 1px solid rgba(255,84,112,0.4);
-    border-radius: 12px; padding: 16px; color: #ff5470;
-    margin: 16px 0;
-  }
-  .methodology {
-    margin: 24px 0; padding: 20px;
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 16px; font-size: 13px; color: var(--text-1);
-    line-height: 1.7;
-  }
-  .methodology h2 {
-    margin: 0 0 12px 0; font-size: 16px;
-    background: linear-gradient(135deg, var(--text-0), var(--accent));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  }
-  .methodology code {
-    background: rgba(120,160,255,0.08); padding: 2px 6px;
-    border-radius: 4px; font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; color: var(--accent);
-  }
-  .controls {
-    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
-    margin: 16px 0 20px 0; padding: 14px 18px;
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 14px; backdrop-filter: blur(14px);
-  }
-  .controls label { color: var(--text-1); font-size: 13px; }
-  .controls a {
-    padding: 8px 14px; border-radius: 10px; font-size: 13px;
-    background: var(--bg-1); border: 1px solid var(--border);
-    color: var(--text-0); text-decoration: none; transition: all 0.2s;
-  }
-  .controls a:hover { border-color: var(--border-hover); }
-  .controls a.active {
-    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
-    border-color: var(--accent);
-  }
-  .empty-note { color: var(--text-2); padding: 20px; font-size: 14px; }
-</style>
-</head>
-<body>
-
-<a class="back" href="/theory">← Теория</a>
-<h1>🌍 Климатические индексы</h1>
-<div class="sub">ENSO · SSW · Полярный вихрь · период: {{ period.start }} — {{ period.end }}</div>
-
-{% if error %}
-  <div class="error-box">⚠️ {{ error }}</div>
-{% endif %}
-
-<div class="controls">
-  <label>Период:</label>
-  <a href="/climate?days=90"  class="{% if days_back == 90  %}active{% endif %}">3 мес.</a>
-  <a href="/climate?days=180" class="{% if days_back == 180 %}active{% endif %}">6 мес.</a>
-  <a href="/climate?days=365" class="{% if days_back == 365 %}active{% endif %}">1 год</a>
-  <a href="/climate?days=730" class="{% if days_back == 730 %}active{% endif %}">2 года</a>
-</div>
-
-{% if enso and not enso.error %}
-<div class="section">
-  <h2>🌊 ENSO — Эль-Ниньо / Ла-Нинья (Niño 3.4)</h2>
-  <div class="kpi-grid">
-    <div class="kpi">
-      <div class="lbl">ONI, °C</div>
-      <div class="val {% if enso.current_oni is not none and enso.current_oni >= 0.5 %}bad{% elif enso.current_oni is not none and enso.current_oni <= -0.5 %}warn{% else %}good{% endif %}">
-        {{ '%+.2f'|format(enso.current_oni) if enso.current_oni is not none else '—' }}
-      </div>
-      <div class="sub">3-мес. скользящее</div>
-    </div>
-    <div class="kpi">
-      <div class="lbl">Фаза</div>
-      <div class="val" style="font-size:16px;">{{ enso.classification }}</div>
-      <div class="sub">по порогам ±0.5 °C</div>
-    </div>
-  </div>
-  <div class="summary-box">{{ enso.summary_text }}</div>
-  <div class="chart-block">{{ enso.svg | safe }}</div>
-</div>
-{% elif enso and enso.error %}
-  <div class="section">
-    <h2>🌊 ENSO</h2>
-    <div class="error-box">⚠️ {{ enso.error }}</div>
-  </div>
-{% endif %}
-
-{% if ssw and not ssw.error %}
-<div class="section">
-  <h2>💥 SSW — Внезапные стратосферные потепления</h2>
-  <div class="kpi-grid">
-    <div class="kpi">
-      <div class="lbl">Событий SSW</div>
-      <div class="val {% if ssw.n_events == 0 %}good{% elif ssw.n_events < 3 %}warn{% else %}bad{% endif %}">
-        {{ ssw.n_events }}
-      </div>
-      <div class="sub">за выбранный период</div>
-    </div>
-    <div class="kpi">
-      <div class="lbl">Порог SSW</div>
-      <div class="val" style="font-size:14px;">+25 °C</div>
-      <div class="sub">за 7 суток на 10 гПа</div>
-    </div>
-  </div>
-  <div class="summary-box">{{ ssw.summary_text }}</div>
-  <div class="chart-block">{{ ssw.svg | safe }}</div>
-  {% if ssw.events %}
-    <h3 style="margin-top:16px;font-size:15px;color:var(--text-0);">Последние события</h3>
-    <ul class="events-list">
-      {% for ev in ssw.events %}
-        <li><span class="date">{{ ev.date }}</span> — {{ ev.description }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-</div>
-{% elif ssw and ssw.error %}
-  <div class="section">
-    <h2>💥 SSW</h2>
-    <div class="error-box">⚠️ {{ ssw.error }}</div>
-  </div>
-{% endif %}
-
-{% if pv and not pv.error %}
-<div class="section">
-  <h2>🌀 Полярный вихрь (10 гПа, 60°N)</h2>
-  <div class="kpi-grid">
-    <div class="kpi">
-      <div class="lbl">Геопотенциал 10 гПа</div>
-      <div class="val">
-        {{ '%.0f'|format(pv.gph_mean) if pv.gph_mean is not none else '—' }} м
-      </div>
-      <div class="sub">средний за период</div>
-    </div>
-    <div class="kpi">
-      <div class="lbl">Состояние PV</div>
-      <div class="val" style="font-size:16px;">{{ pv.classification }}</div>
-      <div class="sub">по порогам ERA5</div>
-    </div>
-  </div>
-  <div class="summary-box">{{ pv.summary_text }}</div>
-  <div class="chart-block">{{ pv.svg | safe }}</div>
-</div>
-{% elif pv and pv.error %}
-  <div class="section">
-    <h2>🌀 Полярный вихрь</h2>
-    <div class="error-box">⚠️ {{ pv.error }}</div>
-  </div>
-{% endif %}
-
-<div class="methodology">
-  <h2>📚 Методика</h2>
-  <p>
-    <b>ENSO (El Niño — Southern Oscillation).</b>
-    SST в области Niño 3.4 (5°N–5°S, 120°W–170°W).
-    Аномалия относительно климата 1991–2020, 3-месячное скользящее — ONI.
-    Пороги: <code>ONI ≥ +0.5</code> — Эль-Ниньо,
-    <code>ONI ≤ −0.5</code> — Ла-Нинья,
-    <code>|ONI| ≥ 1.5</code> — сильное событие.
-  </p>
-  <p>
-    <b>SSW (Sudden Stratospheric Warming).</b>
-    Резкое повышение T в стратосфере на 10 гПа (≈30 км) над Арктикой
-    на +25 °C и более за неделю.
-  </p>
-  <p>
-    <b>PV (Polar Vortex).</b>
-    Геопотенциал 10 гПа в точке 60°N, 0°. Пороги (ERA5):
-    <code>&lt; 29000 м</code> — очень сильный,
-    <code>29000–30000</code> — сильный,
-    <code>30000–30500</code> — норма,
-    <code>30500–31000</code> — ослабленный,
-    <code>&gt; 31000</code> — разрушенный.
-  </p>
-  <p><b>Источник:</b> Open-Meteo Archive API (ERA5 reanalysis).</p>
-</div>
-
-""" + render_biblio_ref("climate") + """
-""" + COMMON_JS + render_top_controls() + render_legend("climate") + """
-</body>
-</html>
-"""
-
-
-# ==================================================================
-# БИБЛИОГРАФИЯ
-# ==================================================================
 BIBLIOGRAPHY_HTML = """<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7850,8 +6811,384 @@ COMPARE_POINT_HTML = """<!DOCTYPE html>
 </html>
 """
 # ==================================================================
+# АРХИВ ПРОГОНОВ КАРТ
+# ==================================================================
+ARCHIVE_HTML = r"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Архив прогонов — weather-msk</title>
+<link rel="stylesheet" href="/static/leaflet/leaflet.css"/>
+<script src="/static/leaflet/leaflet.js"></script>
+""" + BASE_STYLE + """
+<style>
+  .archive-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .archive-layout { grid-template-columns: 1fr; }
+  }
+
+  .runs-list {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    backdrop-filter: blur(14px);
+    padding: 12px;
+    max-height: 78vh;
+    overflow-y: auto;
+  }
+  .runs-list h3 {
+    margin: 12px 0 6px 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-2);
+    font-weight: 700;
+  }
+  .runs-list h3:first-child { margin-top: 0; }
+
+  .run-item {
+    display: block;
+    padding: 10px 12px;
+    margin: 4px 0;
+    border-radius: 10px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .run-item:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-2);
+    color: var(--text-0);
+  }
+  .run-item.active {
+    background: linear-gradient(135deg, rgba(77,171,255,0.25), rgba(124,92,255,0.25));
+    border-color: var(--accent);
+    color: var(--text-0);
+  }
+  .run-item .stamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .run-item .meta {
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .run-item.active .meta { color: var(--text-1); }
+
+  #map {
+    height: 78vh;
+    min-height: 520px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--bg-0);
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 12px 0;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    backdrop-filter: blur(14px);
+  }
+  .toolbar label {
+    color: var(--text-1);
+    font-size: 13px;
+    margin-right: 6px;
+  }
+  .toolbar select {
+    padding: 8px 12px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-0);
+    font-size: 13px;
+    outline: none;
+  }
+  .toolbar select:focus { border-color: var(--accent); }
+  .toolbar button, .toolbar a.btn {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: linear-gradient(135deg, #4dabff, #7c5cff);
+    color: #fff;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.2s;
+  }
+  .toolbar button:hover, .toolbar a.btn:hover { opacity: 0.9; }
+  .toolbar button:disabled, .toolbar a.btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .empty-note {
+    color: var(--text-2);
+    padding: 30px 20px;
+    text-align: center;
+    font-size: 14px;
+  }
+  .layer-toggles {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .layer-toggles label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-1);
+    font-size: 13px;
+    cursor: pointer;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<a class="back" href="/maps">← Карта (live)</a>
+<h1>📂 Архив прогонов</h1>
+<div class="sub">Выберите прогон слева — слои загрузятся из архива</div>
+
+<div class="archive-layout">
+  <div class="runs-list" id="runs-list">
+    <div class="empty-note">Загрузка...</div>
+  </div>
+
+  <div>
+    <div class="toolbar">
+      <div class="layer-toggles">
+        <label><input type="checkbox" id="layer-t2m" checked> 🌡 Температура</label>
+        <label><input type="checkbox" id="layer-pmsl" checked> 📊 Давление</label>
+        <label><input type="checkbox" id="layer-wind" checked> 💨 Ветер</label>
+        <label><input type="checkbox" id="layer-prec"> 🌧 Осадки</label>
+        <label><input type="checkbox" id="layer-clct"> ☁️ Облачность</label>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <label>Скачать слой:</label>
+      <select id="download-layer">
+        <option value="t2m">🌡 Температура</option>
+        <option value="pmsl">📊 Давление</option>
+        <option value="wind">💨 Ветер</option>
+        <option value="prec">🌧 Осадки</option>
+        <option value="clct">☁️ Облачность</option>
+      </select>
+      <a class="btn disabled" id="btn-download-one" href="#" download>💾 Скачать PNG</a>
+
+      <a class="btn disabled" id="btn-download-zip" href="#" download style="margin-left:auto;">📦 Скачать ZIP</a>
+    </div>
+
+    <div id="map"></div>
+  </div>
+</div>
+
+<script>
+var map = L.map('map', { zoomControl: true })
+             .setView([55.75, 37.62], 6);
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19,
+}).addTo(map);
+
+var BOUNDS = {{ meta.bounds | tojson }};
+var overlays = {};
+var activeRun = null;
+
+function removeLayer(name) {
+  if (overlays[name]) {
+    map.removeLayer(overlays[name]);
+    delete overlays[name];
+  }
+}
+
+function addLayer(name, url, opacity) {
+  removeLayer(name);
+  overlays[name] = L.imageOverlay(url, BOUNDS, {
+    opacity: opacity,
+  }).addTo(map);
+}
+
+function updateLayers() {
+  if (!activeRun) return;
+
+  var layers = [
+    ['t2m',  document.getElementById('layer-t2m').checked,  0.75],
+    ['pmsl', document.getElementById('layer-pmsl').checked, 1.0],
+    ['wind', document.getElementById('layer-wind').checked, 0.9],
+    ['prec', document.getElementById('layer-prec').checked, 0.75],
+    ['clct', document.getElementById('layer-clct').checked, 0.6],
+  ];
+  layers.forEach(function(item) {
+    var name = item[0];
+    var enabled = item[1];
+    var opacity = item[2];
+    if (enabled) {
+      addLayer(name, activeRun.baseUrl + activeRun.step3 + '_' + name + '.png', opacity);
+    } else {
+      removeLayer(name);
+    }
+  });
+}
+
+// ---- Загрузка списка прогонов ----
+function loadRuns() {
+  fetch('/api/maps-archive')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var container = document.getElementById('runs-list');
+      var runs = data.runs || [];
+
+      if (!runs.length) {
+        container.innerHTML = '<div class="empty-note">Архив пуст.<br>Нажмите «⚙ Генерировать» на <a href="/maps" style="color:var(--accent)">карте</a>.</div>';
+        return;
+      }
+
+      // Группируем по модели (icon-eu, gfs, ...)
+      var groups = {};
+      runs.forEach(function(run) {
+        var parts = run.stamp.split('_');
+        var model = parts[0] || 'other';
+        if (!groups[model]) groups[model] = [];
+        groups[model].push(run);
+      });
+
+      var modelNames = { 'icon-eu': 'ICON-EU (DWD)', 'gfs': 'GFS (NOAA)' };
+
+      var html = '';
+      Object.keys(groups).sort().forEach(function(model) {
+        html += '<h3>' + (modelNames[model] || model.toUpperCase()) + '</h3>';
+        groups[model].forEach(function(run) {
+          var dateStr = run.stamp.split('_')[1] || '';
+          var year = dateStr.substr(0, 4);
+          var month = dateStr.substr(4, 2);
+          var day = dateStr.substr(6, 2);
+          var hour = dateStr.substr(8, 2);
+          var label = day + '.' + month + '.' + year + ' · ' + hour + ':00 UTC';
+
+          var baseUrl = '/static/maps/archive/' + year + '/' + month + '/' + day + '/'
+                      + model + '_' + dateStr + '_';
+
+          var availableSteps = {};
+          run.files.forEach(function(f) {
+            var m = f.match(/_([0-9]{3})_/);
+            if (m) availableSteps[m[1]] = true;
+          });
+          var steps = Object.keys(availableSteps).sort();
+          var step3 = steps.length ? steps[steps.length - 1] : '012';
+
+          html += '<a class="run-item" '
+                + 'data-stamp="' + run.stamp + '" '
+                + 'data-base="' + baseUrl + '" '
+                + 'data-step="' + step3 + '" '
+                + 'href="/archive/' + run.stamp + '">'
+                + '<span class="stamp">' + label + '</span>'
+                + '<span class="meta">' + run.files.length + ' файлов · шаг +' + parseInt(step3) + 'ч</span>'
+                + '</a>';
+        });
+      });
+      container.innerHTML = html;
+
+      container.querySelectorAll('.run-item').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+          e.preventDefault();
+          selectRun(el);
+          history.replaceState(null, '', '/archive/' + el.dataset.stamp);
+        });
+      });
+
+      // Автовыбор: первый прогон или тот, что в URL
+      var pathMatch = location.pathname.match(new RegExp('^/archive/(.+)$'));
+      if (pathMatch) {
+        var target = container.querySelector('[data-stamp="' + pathMatch[1] + '"]');
+        if (target) {
+          selectRun(target);
+          return;
+        }
+      }
+      var first = container.querySelector('.run-item');
+      if (first) selectRun(first);
+    })
+    .catch(function(err) {
+      document.getElementById('runs-list').innerHTML =
+        '<div class="empty-note">Ошибка загрузки: ' + err.message + '</div>';
+    });
+}
+
+function selectRun(el) {
+  document.querySelectorAll('.run-item').forEach(function(x) {
+    x.classList.remove('active');
+  });
+  el.classList.add('active');
+
+  activeRun = {
+    stamp: el.dataset.stamp,
+    baseUrl: el.dataset.base,
+    step3: el.dataset.step,
+  };
+
+  // Обновляем кнопки скачивания
+  var dlOne = document.getElementById('btn-download-one');
+  var dlZip = document.getElementById('btn-download-zip');
+  dlOne.classList.remove('disabled');
+  dlZip.classList.remove('disabled');
+  dlZip.href = '/api/maps-archive-zip/' + activeRun.stamp;
+
+  updateDownloadOne();
+  updateLayers();
+}
+
+function updateDownloadOne() {
+  if (!activeRun) return;
+  var layer = document.getElementById('download-layer').value;
+  var url = activeRun.baseUrl + activeRun.step3 + '_' + layer + '.png';
+  var dlOne = document.getElementById('btn-download-one');
+  dlOne.href = url;
+  dlOne.download = activeRun.stamp + '_' + activeRun.step3 + '_' + layer + '.png';
+}
+
+['layer-t2m','layer-pmsl','layer-wind','layer-prec','layer-clct'].forEach(function(id) {
+  document.getElementById(id).addEventListener('change', updateLayers);
+});
+document.getElementById('download-layer').addEventListener('change', updateDownloadOne);
+
+loadRuns();
+</script>
+
+""" + COMMON_JS + render_top_controls() + """
+</body>
+</html>
+"""
+# ==================================================================
 # ИНТЕРАКТИВНАЯ КАРТА ПОГОДЫ (Leaflet)
 # ==================================================================
+
 MAPS_HTML = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7991,7 +7328,6 @@ MAPS_HTML = r"""<!DOCTYPE html>
 <body>
 
 <a class="back" href="/forecast">← Прогноз</a>
-<a class="back" href="/forecast">← Прогноз</a>
 <a class="back" href="/map" style="margin-left:8px;">🗺 Простая карта (OSM/спутник)</a>
 <h1>🗺 Карта погоды</h1>
 <div class="sub">OSM · спутник · интерактивные слои ICON-EU / GFS · поиск региона</div>
@@ -8014,16 +7350,10 @@ MAPS_HTML = r"""<!DOCTYPE html>
       style="list-style:none;padding:0;margin:6px 0 0 0;
              max-height:140px;overflow-y:auto;font-size:12px;"></ul>
 
-  <h3>Архив прогонов</h3>
-  <select id="archive-select" style="width:100%;padding:6px 8px;
-          background:var(--bg-1);border:1px solid var(--border);
-          border-radius:8px;color:var(--text-0);font-size:12px;outline:none;">
-    <option value="">— Загружается... —</option>
-  </select>
-  <div class="btn-row" style="margin-top:6px;">
-    <button onclick="loadArchiveRun()">📂 Показать архив</button>
-    <button class="secondary" onclick="switchToLatest()">↺ Последние</button>
-  </div>
+  <a class="back" href="/archive"
+     style="display:block;width:100%;text-align:center;margin:12px 0 0 0;">
+    📂 Все прогоны → архив
+  </a>
 
   <h3>Модель</h3>
   <select id="model-select">
@@ -8289,95 +7619,6 @@ document.getElementById('step-select').addEventListener('change', updateMaps);
   document.getElementById('layer-' + key)
     .addEventListener('change', updateMaps);
 });
-
-// ============================================================
-// АРХИВ ПРОГОНОВ
-// ============================================================
-var archiveRuns = [];
-
-function loadArchive() {
-  fetch('/api/maps-archive')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var sel = document.getElementById('archive-select');
-      sel.innerHTML = '<option value="">— Последние —</option>';
-      archiveRuns = data.runs || [];
-      archiveRuns.slice(0, 50).forEach(function(run, idx) {
-        var opt = document.createElement('option');
-        opt.value = idx;
-        opt.textContent = run.stamp + ' · ' + run.files.length + ' файлов';
-        sel.appendChild(opt);
-      });
-    })
-    .catch(function() {
-      document.getElementById('archive-select').innerHTML =
-        '<option value="">— Ошибка загрузки —</option>';
-    });
-}
-
-function loadArchiveRun() {
-  var sel = document.getElementById('archive-select');
-  var status = document.getElementById('status');
-
-  if (!sel.value) {
-    updateMaps();
-    return;
-  }
-
-  var idx = parseInt(sel.value, 10);
-  var run = archiveRuns[idx];
-  if (!run) return;
-
-  var parts = run.stamp.split('_');
-  var model = parts[0];
-  var dateStr = parts[1];
-
-  document.getElementById('model-select').value = model;
-
-  var baseUrl = '/static/maps/archive/'
-              + dateStr.substr(0, 4) + '/'
-              + dateStr.substr(4, 2) + '/'
-              + dateStr.substr(6, 2) + '/'
-              + model + '_' + dateStr + '_';
-
-  var availableSteps = {};
-  run.files.forEach(function(f) {
-      var m = f.match(/_([0-9]{3})_/);
-    if (m) availableSteps[m[1]] = true;
-  });
-
-  var stepSel = document.getElementById('step-select');
-  var currentStep = stepSel.value;
-  var step3 = String(currentStep).padStart(3, '0');
-
-  if (!availableSteps[step3]) {
-    var keys = Object.keys(availableSteps).sort();
-    if (keys.length > 0) {
-      stepSel.value = parseInt(keys[0], 10);
-      step3 = keys[0];
-    }
-  }
-
-  toggleLayer('t2m',  baseUrl + step3 + '_t2m.png',
-              document.getElementById('layer-t2m').checked, 0.75);
-  toggleLayer('pmsl', baseUrl + step3 + '_pmsl.png',
-              document.getElementById('layer-pmsl').checked, 1.0);
-  toggleLayer('wind', baseUrl + step3 + '_wind.png',
-              document.getElementById('layer-wind').checked, 0.9);
-  toggleLayer('prec', baseUrl + step3 + '_prec.png',
-              document.getElementById('layer-prec').checked, 0.75);
-  toggleLayer('clct', baseUrl + step3 + '_clct.png',
-              document.getElementById('layer-clct').checked, 0.6);
-
-  status.textContent = '📂 Архив: ' + run.stamp + ' · шаг ' + step3;
-}
-
-function switchToLatest() {
-  document.getElementById('archive-select').value = '';
-  updateMaps();
-}
-
-loadArchive();
 
 // Автозагрузка при открытии
 updateMaps();

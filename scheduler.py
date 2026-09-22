@@ -2,7 +2,10 @@
 """
 Планировщик фонового обновления карт.
 
-Запуск (отдельный процесс):
+Запускается автоматически при старте Flask (см. server.py).
+Работает в фоновом потоке (BackgroundScheduler), не блокирует сервер.
+
+Отдельный ручной запуск (для отладки):
     python scheduler.py
 
 Cron-эквивалент:
@@ -14,6 +17,7 @@ import os
 import shutil
 from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from maps_generator import generate_all_layers, ARCHIVE_DIR
@@ -21,6 +25,9 @@ from maps_generator import generate_all_layers, ARCHIVE_DIR
 
 # Хранить архив 90 дней
 ARCHIVE_RETENTION_DAYS = 90
+
+# Глобальный инстанс планировщика
+_scheduler = None
 
 
 def job():
@@ -82,7 +89,6 @@ def cleanup_archive():
                         print(f"[scheduler]   Ошибка удаления "
                               f"{year}/{month}/{day}: {e}", flush=True)
 
-            # Удаляем пустые месяцы
             try:
                 if not os.listdir(month_path):
                     os.rmdir(month_path)
@@ -90,7 +96,6 @@ def cleanup_archive():
             except OSError:
                 pass
 
-        # Удаляем пустые годы
         try:
             if not os.listdir(year_path):
                 os.rmdir(year_path)
@@ -102,18 +107,81 @@ def cleanup_archive():
           f"{removed_days} дней, {removed_dirs} пустых папок", flush=True)
 
 
+def init_scheduler(app=None):
+    """
+    Инициализирует фоновый планировщик.
+
+    Вызывается из server.py при старте приложения.
+    Защищён от двойного запуска в режиме debug=True (Flask reloader).
+    """
+    global _scheduler
+    if _scheduler is not None:
+        print("[scheduler] Уже запущен, повторная инициализация пропущена",
+              flush=True)
+        return _scheduler
+
+    # Защита от двойного запуска в Flask reloader
+    if app is not None and app.debug:
+        # WERKZEUG_RUN_MAIN == "true" только в дочернем процессе reloader
+        if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+            print("[scheduler] Пропущено в reloader-родителе", flush=True)
+            return None
+
+    _scheduler = BackgroundScheduler(timezone="UTC")
+
+    # Обновление карт каждые 3 часа (в :20)
+    _scheduler.add_job(
+        job,
+        "cron",
+        hour="*/3",
+        minute=20,
+        id="update_maps",
+        replace_existing=True,
+    )
+
+    # Очистка архива раз в сутки в 03:00 UTC
+    _scheduler.add_job(
+        cleanup_archive,
+        "cron",
+        hour=3,
+        minute=0,
+        id="cleanup_archive",
+        replace_existing=True,
+    )
+
+    _scheduler.start()
+
+    print(
+        f"[scheduler] Запущен в фоне. Обновление каждые 3 часа, "
+        f"очистка архива раз в сутки (хранить {ARCHIVE_RETENTION_DAYS} дней).",
+        flush=True,
+    )
+
+    # Первый запуск сразу (в фоне, чтобы не блокировать старт Flask)
+    try:
+        import threading
+        threading.Thread(target=job, daemon=True).start()
+        print("[scheduler] Первая генерация запущена в фоне", flush=True)
+    except Exception as e:
+        print(f"[scheduler] Ошибка первого запуска: {e}", flush=True)
+
+    return _scheduler
+
+
+# ============================================================
+# Ручной запуск (python scheduler.py)
+# ============================================================
 if __name__ == "__main__":
     sched = BlockingScheduler(timezone="UTC")
 
-    # Обновление карт каждые 3 часа
     sched.add_job(job, "cron", hour="*/3", minute=20)
-
-    # Очистка архива раз в сутки в 03:00 UTC
     sched.add_job(cleanup_archive, "cron", hour=3, minute=0)
 
-    print(f"[scheduler] Старт. Обновление каждые 3 часа, "
-          f"очистка архива раз в сутки (хранить {ARCHIVE_RETENTION_DAYS} дней).",
-          flush=True)
+    print(
+        f"[scheduler] Ручной старт. Обновление каждые 3 часа, "
+        f"очистка архива раз в сутки (хранить {ARCHIVE_RETENTION_DAYS} дней).",
+        flush=True,
+    )
 
     # Первый запуск сразу
     job()
