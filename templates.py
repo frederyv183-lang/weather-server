@@ -359,7 +359,146 @@ def render_top_controls():
       })();
     </script>
     """
+# ==================================================================
+# ГЛОБАЛЬНАЯ ШАПКА (навигация как на дашборде)
+# ==================================================================
+def render_header(active=""):
+    """
+    Возвращает HTML-шапку с горизонтальным меню.
+    active — ключ активного пункта: 'home', 'forecast', 'analysis',
+             'theory', 'maps', 'archive', 'about' или '' (нет активного).
+    """
+    items = [
+        ("home",     "/",            "Главная"),
+        ("forecast", "/forecast",    "Прогнозы"),
+        ("analysis", "/analysis",    "Анализ"),
+        ("theory",   "/theory",      "Теория"),
+        ("maps",     "/maps",        "Карты"),
+        ("archive",  "/archive",     "Архив"),
+        ("about",    "/about",       "О проекте"),
+    ]
 
+    links = ""
+    for key, url, label in items:
+        cls = "active" if key == active else ""
+        links += f'<a href="{url}" class="nav-link {cls}">{label}</a>'
+
+    return f"""
+<header class="topnav">
+  <div class="topnav-inner">
+    <a href="/" class="brand">
+      <span class="brand-icon">≈</span>
+      <span class="brand-text">weather-msk</span>
+    </a>
+    <nav class="nav-links">
+      {links}
+    </nav>
+    <div class="nav-right">
+      <button id="theme-btn" onclick="toggleTheme()" title="Сменить тему">🌙</button>
+      <button id="season-btn" onclick="cycleSeason()" title="Сезон">🍂</button>
+    </div>
+  </div>
+</header>
+<style>
+  .topnav {{
+    position: sticky;
+    top: 0;
+    z-index: 9000;
+    background: rgba(15, 21, 36, 0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    margin: -20px -20px 20px -20px;
+  }}
+  [data-theme="light"] .topnav {{
+    background: rgba(255, 255, 255, 0.85);
+  }}
+  .topnav-inner {{
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }}
+  .brand {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--text-0);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+    flex-shrink: 0;
+  }}
+  .brand-icon {{
+    color: var(--accent);
+    font-size: 20px;
+    font-weight: 800;
+  }}
+  .nav-links {{
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex: 1;
+  }}
+  .nav-link {{
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-1);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }}
+  .nav-link:hover {{
+    color: var(--text-0);
+    background: rgba(77, 171, 255, 0.08);
+  }}
+  .nav-link.active {{
+    color: var(--text-0);
+    background: linear-gradient(135deg, rgba(77, 171, 255, 0.20), rgba(124, 92, 255, 0.20));
+    border: 1px solid rgba(77, 171, 255, 0.3);
+  }}
+  .nav-right {{
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }}
+  .nav-right button {{
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-0);
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }}
+  .nav-right button:hover {{
+    border-color: var(--border-hover);
+    background: rgba(77, 171, 255, 0.08);
+  }}
+  @media (max-width: 900px) {{
+    .topnav-inner {{ padding: 0 12px; gap: 12px; }}
+    .nav-links {{ overflow-x: auto; }}
+    .nav-link {{ padding: 6px 10px; font-size: 12px; }}
+  }}
+</style>
+<script>
+  (function(){{
+    var b = document.getElementById('theme-btn');
+    if (b) b.textContent = (window.__currentTheme === 'light') ? '☀️' : '🌙';
+    if (typeof updateSeasonButton === 'function') updateSeasonButton();
+  }})();
+</script>
+"""
 
 # ==================================================================
 # ЛЕГЕНДА СОКРАЩЕНИЙ
@@ -531,49 +670,206 @@ FORECAST_HUB_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Прогноз — weather-msk</title>
 """ + BASE_STYLE + """
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .widget {
+    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    backdrop-filter: blur(14px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text-0);
+    display: flex;
+    flex-direction: column;
+    min-height: 160px;
+  }
+  .widget:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: var(--card-shadow);
+  }
+  .widget::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .widget:hover::before { opacity: 1; }
+
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .widget-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-0);
+  }
+  .widget-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--accent);
+    margin: 6px 0;
+  }
+  .widget-sub {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: auto;
+    line-height: 1.5;
+  }
+  .widget-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0 0;
+    font-size: 13px;
+  }
+  .widget-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(120, 160, 255, 0.06);
+    color: var(--text-1);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .widget-list li:last-child { border-bottom: none; }
+  .widget-list li span:last-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-0);
+    white-space: nowrap;
+  }
+  .widget-accent-blue   { --accent: #4dabff; }
+  .widget-accent-green  { --accent: #00e5a0; }
+  .widget-accent-orange { --accent: #ffb547; }
+  .widget-accent-purple { --accent: #a78bfa; }
+  .widget-accent-red    { --accent: #ff5470; }
+</style>
 </head>
 <body>
 
-<a class="back" href="/">← На главную</a>
+""" + render_header("forecast") + """
 <h1>🌍 Прогноз погоды</h1>
 <div class="sub">Численные модели · поиск по точке · сравнение · синоптика</div>
 
-<a class="card fade-in" href="/model/gfs" style="animation-delay: 0.05s">
-  <span class="icon">🌐</span><b>Модель GFS (США)</b>
-  <div class="desc">Глобальная модель NOAA, ~13 км · таблица, текст, график</div>
-</a>
+<div class="dashboard-grid">
 
-<a class="card fade-in" href="/model/ecmwf" style="animation-delay: 0.10s">
-  <span class="icon">🌐</span><b>Модель ECMWF (Европа)</b>
-  <div class="desc">Эталонная европейская модель, ~9–25 км</div>
-</a>
+  <!-- GFS -->
+  <a class="widget widget-accent-blue" href="/model/gfs">
+    <div class="widget-header">
+      <span>🌐 Модель GFS</span>
+      <span>NOAA · США</span>
+    </div>
+    <div class="widget-title">Global Forecast System</div>
+    <div class="widget-value">~13 км</div>
+    <div class="widget-sub">
+      Таблица · текст · график · авиация · синоптика
+    </div>
+  </a>
 
-<a class="card fade-in" href="/model/icon" style="animation-delay: 0.15s">
-  <span class="icon">🌐</span><b>Модель ICON (Германия)</b>
-  <div class="desc">Модель DWD, ~11 км</div>
-</a>
+  <!-- ECMWF -->
+  <a class="widget widget-accent-orange" href="/model/ecmwf">
+    <div class="widget-header">
+      <span>🌐 Модель ECMWF</span>
+      <span>Европа</span>
+    </div>
+    <div class="widget-title">European Centre</div>
+    <div class="widget-value">~9–25 км</div>
+    <div class="widget-sub">
+      Эталонная европейская модель · все виды прогноза
+    </div>
+  </a>
 
-<a class="card fade-in" href="/search" style="animation-delay: 0.20s;background:rgba(124,92,255,0.10);">
-  <span class="icon">🔍</span><b>Поиск прогноза для любой точки</b>
-  <div class="desc">Город, координаты, индекс — таблица, текст, график, авиация, синоптика</div>
-</a>
+  <!-- ICON -->
+  <a class="widget widget-accent-green" href="/model/icon">
+    <div class="widget-header">
+      <span>🌐 Модель ICON</span>
+      <span>DWD · Германия</span>
+    </div>
+    <div class="widget-title">Icosahedral Nonhydrostatic</div>
+    <div class="widget-value">~11 км</div>
+    <div class="widget-sub">
+      Немецкая модель · все виды прогноза
+    </div>
+  </a>
 
-<a class="card fade-in" href="/chart/tushino" style="animation-delay: 0.25s">
-  <span class="icon">📈</span><b>Сравнить модели на графике</b>
-  <div class="desc">Температура, давление, ветер, осадки · факт ERA5</div>
-</a>
+  <!-- Поиск точки -->
+  <a class="widget widget-accent-purple" href="/search">
+    <div class="widget-header">
+      <span>🔍 Поиск точки</span>
+      <span>Геокодинг</span>
+    </div>
+    <div class="widget-title">Прогноз для любой точки</div>
+    <ul class="widget-list">
+      <li><span>📊 Таблица</span><span>+</span></li>
+      <li><span>📝 Текст</span><span>+</span></li>
+      <li><span>📈 График</span><span>+</span></li>
+      <li><span>✈️ Авиация</span><span>+</span></li>
+    </ul>
+  </a>
 
-<a class="card fade-in" href="/synoptic/gfs/tushino" style="animation-delay: 0.28s;background:rgba(255,84,112,0.10);">
-  <span class="icon">🌡</span><b>Синоптика по уровням</b>
-  <div class="desc">Профиль T, θ, RH на 925–300 гПа · тропопауза · струя · фронты · LI, K-Index</div>
-</a>
+  <!-- График моделей -->
+  <a class="widget widget-accent-blue" href="/chart/tushino">
+    <div class="widget-header">
+      <span>📈 Сравнить модели</span>
+      <span>График</span>
+    </div>
+    <div class="widget-title">GFS vs ECMWF vs ICON</div>
+    <div class="widget-value">T · P · V · 🌧</div>
+    <div class="widget-sub">
+      Температура · давление · ветер · осадки · факт ERA5
+    </div>
+  </a>
 
-<a class="card fade-in" href="/maps" style="animation-delay: 0.30s">
-  <span class="icon">🗺</span><b>Карта + спутник + радар</b>
-  <div class="desc">OSM · спутник · RainViewer · облачность · поиск · клик по точке</div>
-</a>
+  <!-- Синоптика -->
+  <a class="widget widget-accent-red" href="/synoptic/gfs/tushino">
+    <div class="widget-header">
+      <span>🌡 Синоптика по уровням</span>
+      <span>925–300 гПа</span>
+    </div>
+    <div class="widget-title">Профиль атмосферы</div>
+    <ul class="widget-list">
+      <li><span>T · θ · RH</span><span>925–300</span></li>
+      <li><span>Тропопауза</span><span>2 PVU</span></li>
+      <li><span>Струя</span><span>300 гПа</span></li>
+      <li><span>LI · K-Index</span><span>+</span></li>
+    </ul>
+  </a>
 
-""" + COMMON_JS + render_top_controls() + render_legend("forecast") + """
+  <!-- Карта -->
+  <a class="widget widget-accent-green" href="/maps">
+    <div class="widget-header">
+      <span>🗺 Карта + спутник + радар</span>
+      <span>Leaflet</span>
+    </div>
+    <div class="widget-title">Интерактивная карта</div>
+    <div class="widget-sub">
+      OSM · спутник · RainViewer · поиск · клик по точке
+    </div>
+  </a>
+
+</div>
+
+""" + COMMON_JS + render_legend("forecast") + """
 </body>
 </html>
 """
@@ -589,44 +885,182 @@ ANALYSIS_HUB_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Анализ — weather-msk</title>
 """ + BASE_STYLE + """
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .widget {
+    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    backdrop-filter: blur(14px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text-0);
+    display: flex;
+    flex-direction: column;
+    min-height: 170px;
+  }
+  .widget:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: var(--card-shadow);
+  }
+  .widget::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .widget:hover::before { opacity: 1; }
+
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .widget-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-0);
+  }
+  .widget-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0 0;
+    font-size: 13px;
+  }
+  .widget-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(120, 160, 255, 0.06);
+    color: var(--text-1);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .widget-list li:last-child { border-bottom: none; }
+  .widget-list li span:last-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-0);
+    white-space: nowrap;
+  }
+  .widget-sub {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: auto;
+    padding-top: 10px;
+    line-height: 1.5;
+  }
+  .widget-accent-blue   { --accent: #4dabff; }
+  .widget-accent-green  { --accent: #00e5a0; }
+  .widget-accent-orange { --accent: #ffb547; }
+  .widget-accent-purple { --accent: #a78bfa; }
+  .widget-accent-red    { --accent: #ff5470; }
+</style>
 </head>
 <body>
-
-<a class="back" href="/">← На главную</a>
+""" + render_header("analysis") + """
 <h1>📊 Анализ и проверка</h1>
 <div class="sub">Сравнение с фактом · статистика · история ошибок · матрицы</div>
 
-<a class="card fade-in" href="/verify/tushino" style="animation-delay: 0.05s;background:rgba(0,229,160,0.08);">
-  <span class="icon">✅</span><b>Проверка моделей</b>
-  <div class="desc">Сравнение с фактом (станция / ERA5) — MAE, RMSE, Bias, R²</div>
-</a>
+<div class="dashboard-grid">
 
-<a class="card fade-in" href="/verify/tushino/history" style="animation-delay: 0.10s;background:rgba(0,229,160,0.06);">
-  <span class="icon">📉</span><b>История ошибок</b>
-  <div class="desc">Как менялась MAE и Bias за последние дни — по каждой модели</div>
-</a>
+  <!-- Проверка моделей -->
+  <a class="widget widget-accent-green" href="/verify/tushino">
+    <div class="widget-header">
+      <span>✅ Проверка моделей</span>
+      <span>MAE · RMSE</span>
+    </div>
+    <div class="widget-title">Сравнение с фактом</div>
+    <ul class="widget-list">
+      <li><span>MAE · RMSE · Bias</span><span>°C</span></li>
+      <li><span>Корреляция · R²</span><span>+</span></li>
+      <li><span>P90 · MAPE</span><span>+</span></li>
+    </ul>
+  </a>
 
-<a class="card fade-in" href="/analyze/tushino" style="animation-delay: 0.15s;background:rgba(124,92,255,0.10);">
-  <span class="icon">📊</span><b>Статистический анализ</b>
-  <div class="desc">Корреляция, R², MAPE, гистограмма ошибок, F1 по осадкам</div>
-</a>
+  <!-- История ошибок -->
+  <a class="widget widget-accent-green" href="/verify/tushino/history">
+    <div class="widget-header">
+      <span>📉 История ошибок</span>
+      <span>По дням</span>
+    </div>
+    <div class="widget-title">Динамика MAE / Bias</div>
+    <div class="widget-sub">
+      Графики по каждой модели за последние дни
+    </div>
+  </a>
 
-<a class="card fade-in" href="/alt-verify/tushino" style="animation-delay: 0.18s;background:rgba(255,181,71,0.10);">
-  <span class="icon">📋</span><b>Матрица альтернативных прогнозов</b>
-  <div class="desc">Критерии Хандожко: p, H, τ, v, Q, S, F1 · по каждому явлению</div>
-</a>
+  <!-- Статистический анализ -->
+  <a class="widget widget-accent-purple" href="/analyze/tushino">
+    <div class="widget-header">
+      <span>📊 Статистический анализ</span>
+      <span>Гистограммы</span>
+    </div>
+    <div class="widget-title">Расширенная статистика</div>
+    <ul class="widget-list">
+      <li><span>MAPE · P50 · P95</span><span>+</span></li>
+      <li><span>Гистограмма ошибок</span><span>+</span></li>
+      <li><span>F1 по осадкам</span><span>+</span></li>
+    </ul>
+  </a>
 
-<a class="card fade-in" href="/compare-matrices/tushino" style="animation-delay: 0.22s;background:rgba(255,181,71,0.15);">
-  <span class="icon">🔀</span><b>Сравнить модели по матрицам</b>
-  <div class="desc">GFS vs ECMWF vs ICON — по каждому явлению · лучшая модель</div>
-</a>
+  <!-- Матрица Хандожко -->
+  <a class="widget widget-accent-orange" href="/alt-verify/tushino">
+    <div class="widget-header">
+      <span>📋 Матрица прогнозов</span>
+      <span>Хандожко</span>
+    </div>
+    <div class="widget-title">Критерии успешности</div>
+    <ul class="widget-list">
+      <li><span>p, H, τ, v</span><span>+</span></li>
+      <li><span>Q, S, F1</span><span>+</span></li>
+      <li><span>По каждому явлению</span><span>+</span></li>
+    </ul>
+  </a>
 
-<a class="card fade-in" href="/compare/tushino" style="animation-delay: 0.25s">
-  <span class="icon">📋</span><b>Сводка явлений</b>
-  <div class="desc">Сколько часов тумана, грозы, осадков по каждой модели</div>
-</a>
+  <!-- Сравнение матриц -->
+  <a class="widget widget-accent-orange" href="/compare-matrices/tushino">
+    <div class="widget-header">
+      <span>🔀 Сравнить модели</span>
+      <span>Матрицы</span>
+    </div>
+    <div class="widget-title">GFS · ECMWF · ICON</div>
+    <div class="widget-sub">
+      Для каждого явления — матрица 2×2 · кто лучший?
+    </div>
+  </a>
 
-""" + COMMON_JS + render_top_controls() + render_legend("analysis") + """
+  <!-- Сводка явлений -->
+  <a class="widget widget-accent-blue" href="/compare/tushino">
+    <div class="widget-header">
+      <span>📋 Сводка явлений</span>
+      <span>Туман · Гроза</span>
+    </div>
+    <div class="widget-title">Часы с явлениями</div>
+    <div class="widget-sub">
+      Сколько часов тумана, грозы, осадков — по каждой модели
+    </div>
+  </a>
+
+</div>
+
+""" + COMMON_JS + render_legend("analysis") + """
 </body>
 </html>
 """
@@ -643,121 +1077,158 @@ THEORY_HUB_HTML = """<!DOCTYPE html>
 <title>Теория — weather-msk</title>
 """ + BASE_STYLE + """
 <style>
-  .theory-group {
-    margin: 28px 0;
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
   }
-  .theory-group-title {
-    font-size: 14px;
-    font-weight: 700;
+  .widget {
+    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    backdrop-filter: blur(14px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text-0);
+    display: flex;
+    flex-direction: column;
+    min-height: 180px;
+  }
+  .widget:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: var(--card-shadow);
+  }
+  .widget::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .widget:hover::before { opacity: 1; }
+
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
     color: var(--text-2);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin: 0 0 12px 0;
-    padding-left: 12px;
-    border-left: 3px solid var(--accent);
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 600;
   }
-  .theory-group-title .group-icon {
-    margin-right: 8px;
-    font-size: 16px;
+  .widget-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-0);
   }
+  .widget-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0 0;
+    font-size: 13px;
+  }
+  .widget-list li {
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(120, 160, 255, 0.06);
+    color: var(--text-1);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .widget-list li:last-child { border-bottom: none; }
+  .widget-list li span:last-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-0);
+    white-space: nowrap;
+  }
+  .widget-sub {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .widget-accent-blue   { --accent: #4dabff; }
+  .widget-accent-green  { --accent: #00e5a0; }
+  .widget-accent-orange { --accent: #ffb547; }
+  .widget-accent-purple { --accent: #a78bfa; }
+  .widget-accent-red    { --accent: #ff5470; }
 </style>
 </head>
 <body>
-
-<a class="back" href="/">← На главную</a>
+""" + render_header("theory") + """
 <h1>📚 Теория и методы</h1>
 <div class="sub">Методы прогноза · матрицы · индексы · учебные примеры</div>
 
-<div class="theory-group">
-  <h2 class="theory-group-title">
-    <span class="group-icon">🧭</span>Группа А — Методы прогноза
-  </h2>
+<div class="dashboard-grid">
 
-  <a class="card fade-in" href="/aviation/gfs/tushino" style="animation-delay: 0.05s;background:rgba(255,181,71,0.10);">
-    <span class="icon">✈️</span><b>Авиационные прогнозы (Богаткин)</b>
-    <div class="desc">Методы Вайтинга (K), LI, CAPE, туман по Кирюхину · гл. 5–12</div>
+  <!-- Группа А: Методы прогноза -->
+  <a class="widget widget-accent-blue" href="/theory/methods">
+    <div class="widget-header">
+      <span>🧭 Группа А</span>
+      <span>Методы</span>
+    </div>
+    <div class="widget-title">Методы прогноза</div>
+    <ul class="widget-list">
+      <li><span>✈️ Авиационные прогнозы</span><span>K, LI, CAPE</span></li>
+      <li><span>📐 Изоэнтропический</span><span>θ, PV</span></li>
+      <li><span>🌡 Синоптический</span><span>925–300</span></li>
+    </ul>
   </a>
 
-  <a class="card fade-in" href="/theory/methods" style="animation-delay: 0.10s;background:rgba(77,171,255,0.10);">
-    <span class="icon">📐</span><b>Изоэнтропический метод</b>
-    <div class="desc">Анализ на поверхностях θ, потенциальная завихрённость, PV-аномалии</div>
+  <!-- Группа Б: Матрицы -->
+  <a class="widget widget-accent-orange" href="/theory/matrices">
+    <div class="widget-header">
+      <span>📋 Группа Б</span>
+      <span>Матрицы</span>
+    </div>
+    <div class="widget-title">Матрицы и критерии</div>
+    <ul class="widget-list">
+      <li><span>Матрица 2×2</span><span>+</span></li>
+      <li><span>Критерии Хандожко</span><span>p, H, τ, v</span></li>
+      <li><span>Q, S, F1</span><span>+</span></li>
+    </ul>
   </a>
 
-  <a class="card fade-in" href="/synoptic/gfs/tushino" style="animation-delay: 0.15s;background:rgba(255,84,112,0.10);">
-    <span class="icon">🌡</span><b>Синоптический метод</b>
-    <div class="desc">Профиль T, θ, RH на 925–300 гПа · тропопауза · струя · фронты</div>
+  <!-- Группа В: Индексы -->
+  <a class="widget widget-accent-purple" href="/theory/indices">
+    <div class="widget-header">
+      <span>⚡ Группа В</span>
+      <span>Индексы</span>
+    </div>
+    <div class="widget-title">Индексы и явления</div>
+    <ul class="widget-list">
+      <li><span>LI · K-Index · CAPE</span><span>+</span></li>
+      <li><span>ENSO · SSW · PV</span><span>+</span></li>
+      <li><span>Складки тропопаузы</span><span>2 PVU</span></li>
+    </ul>
   </a>
+
+  <!-- Группа Г: Учебное -->
+  <a class="widget widget-accent-green" href="/teaching">
+    <div class="widget-header">
+      <span>📖 Группа Г</span>
+      <span>Учебное</span>
+    </div>
+    <div class="widget-title">Учебные материалы</div>
+    <ul class="widget-list">
+      <li><span>📚 Учебные примеры</span><span>+</span></li>
+      <li><span>📝 Тесты по блокам</span><span>+</span></li>
+      <li><span>📖 Библиография</span><span>+</span></li>
+    </ul>
+  </a>
+
 </div>
 
-<div class="theory-group">
-  <h2 class="theory-group-title">
-    <span class="group-icon">📋</span>Группа Б — Матрицы и критерии
-  </h2>
-
-  <a class="card fade-in" href="/alt-verify/tushino" style="animation-delay: 0.05s;background:rgba(0,229,160,0.10);">
-    <span class="icon">📋</span><b>Матрица сопряжённости (2×2)</b>
-    <div class="desc">Hits · Misses · False alarms · Correct negatives</div>
-  </a>
-
-  <a class="card fade-in" href="/theory/matrices" style="animation-delay: 0.10s;background:rgba(255,181,71,0.15);">
-    <span class="icon">📊</span><b>Критерии Хандожко</b>
-    <div class="desc">p · H · τ · v · Q · S — формулы и интерпретация</div>
-  </a>
-
-  <a class="card fade-in" href="/compare-matrices/tushino" style="animation-delay: 0.15s;background:rgba(255,181,71,0.10);">
-    <span class="icon">🔀</span><b>Сравнить модели по матрицам</b>
-    <div class="desc">GFS vs ECMWF vs ICON — по каждому явлению</div>
-  </a>
-</div>
-
-<div class="theory-group">
-  <h2 class="theory-group-title">
-    <span class="group-icon">🌊</span>Группа В — Индексы и явления
-  </h2>
-
-  <a class="card fade-in" href="/theory/indices" style="animation-delay: 0.05s;background:rgba(124,92,255,0.10);">
-    <span class="icon">⚡</span><b>Индексы неустойчивости</b>
-    <div class="desc">LI · K-Index · CAPE · ΔT(850−500) · сдвиг ветра</div>
-  </a>
-
-  <a class="card fade-in" href="/climate" style="animation-delay: 0.10s;background:rgba(0,229,160,0.10);">
-    <span class="icon">🌊</span><b>ENSO / Эль-Ниньо / Ла-Нинья</b>
-    <div class="desc">ONI, SST Niño 3.4, климатические аномалии</div>
-  </a>
-
-  <a class="card fade-in" href="/climate" style="animation-delay: 0.15s;background:rgba(255,84,112,0.10);">
-    <span class="icon">💥</span><b>Полярный вихрь и SSW</b>
-    <div class="desc">Внезапные стратосферные потепления, PV на 10 гПа</div>
-  </a>
-
-  <a class="card fade-in" href="/tropopause" style="animation-delay: 0.20s;background:rgba(124,92,255,0.10);">
-    <span class="icon">🌀</span><b>Складки тропопаузы (EPV)</b>
-    <div class="desc">Ertel PV, динамическая тропопауза 2 PVU, анализ профиля</div>
-  </a>
-</div>
-
-<div class="theory-group">
-  <h2 class="theory-group-title">
-    <span class="group-icon">📚</span>Группа Г — Учебное
-  </h2>
-
-  <a class="card fade-in" href="/teaching" style="animation-delay: 0.05s;background:rgba(0,229,160,0.08);">
-    <span class="icon">📚</span><b>Учебные примеры</b>
-    <div class="desc">Разборы из Богаткина и Волобуевой — формулы, методы, примеры</div>
-  </a>
-
-  <a class="card fade-in" href="/tests" style="animation-delay: 0.10s;background:rgba(77,171,255,0.10);">
-    <span class="icon">📝</span><b>Тесты по блокам</b>
-    <div class="desc">Проверка знаний: 20 вопросов, результат сразу, разбор ошибок</div>
-  </a>
-
-  <a class="card fade-in" href="/bibliography" style="animation-delay: 0.15s;background:rgba(255,181,71,0.10);">
-    <span class="icon">📖</span><b>Библиография</b>
-    <div class="desc">Источники по всем разделам: авиация, матрицы, ДЗЗ, динамика, климат</div>
-  </a>
-</div>
-
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS + """
 </body>
 </html>
 """
@@ -771,43 +1242,221 @@ INDEX_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Прогноз погоды — weather-msk</title>
+<title>Дашборд — weather-msk</title>
 """ + BASE_STYLE + """
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .widget {
+    background: linear-gradient(135deg, var(--card-bg), var(--card-bg-2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    backdrop-filter: blur(14px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text-0);
+    display: flex;
+    flex-direction: column;
+    min-height: 160px;
+  }
+  .widget:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: var(--card-shadow);
+  }
+  .widget::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .widget:hover::before { opacity: 1; }
+
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .widget-header .icon-lg {
+    font-size: 18px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .widget-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-0);
+  }
+  .widget-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--accent);
+    margin: 8px 0;
+  }
+  .widget-value.small {
+    font-size: 22px;
+  }
+  .widget-sub {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-top: auto;
+    line-height: 1.5;
+  }
+  .widget-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0 0;
+    font-size: 13px;
+  }
+  .widget-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(120, 160, 255, 0.06);
+    color: var(--text-1);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .widget-list li:last-child { border-bottom: none; }
+  .widget-list li span:last-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-0);
+    white-space: nowrap;
+  }
+  .widget-accent-blue   { --accent: #4dabff; }
+  .widget-accent-green  { --accent: #00e5a0; }
+  .widget-accent-orange { --accent: #ffb547; }
+  .widget-accent-purple { --accent: #a78bfa; }
+  .widget-accent-red    { --accent: #ff5470; }
+</style>
 </head>
 <body>
+""" + render_header("home") + """
+<h1>Дашборд погоды</h1>
+<div class="sub">Сводка по моделям, анализ и инструменты · weather-msk</div>
 
-<h1>Прогноз погоды</h1>
-<div class="sub">Выберите раздел</div>
+<div class="dashboard-grid">
 
-<a class="card fade-in" href="/forecast" style="animation-delay: 0.05s;background:rgba(77,171,255,0.10);">
-  <span class="icon">🌍</span><b>Прогноз погоды</b>
-  <div class="desc">Численные модели GFS / ECMWF / ICON, поиск по точке, сравнение на графике</div>
-</a>
+  <!-- 1. Прогноз -->
+  <a class="widget widget-accent-blue" href="/forecast">
+    <div class="widget-header">
+      <span>🌍 Прогноз погоды</span>
+      <span>GFS · ECMWF · ICON</span>
+    </div>
+    <div class="widget-title">Численные модели</div>
+    <div class="widget-sub">
+      Таблица · текст · графики · авиация · синоптика
+    </div>
+  </a>
 
-<a class="card fade-in" href="/analysis" style="animation-delay: 0.10s;background:rgba(0,229,160,0.10);">
-  <span class="icon">📊</span><b>Анализ и проверка</b>
-  <div class="desc">Сравнение с фактом, MAE / RMSE / Bias, история ошибок, статистика, матрицы</div>
-</a>
+  <!-- 2. Анализ -->
+  <a class="widget widget-accent-green" href="/analysis">
+    <div class="widget-header">
+      <span>📊 Анализ и проверка</span>
+      <span>MAE · RMSE</span>
+    </div>
+    <div class="widget-title">Верификация моделей</div>
+    <div class="widget-sub">
+      Сравнение с фактом · статистика · история ошибок · матрицы
+    </div>
+  </a>
 
-<a class="card fade-in" href="/theory" style="animation-delay: 0.15s;background:rgba(255,181,71,0.10);">
-  <span class="icon">📚</span><b>Теория и методы</b>
-  <div class="desc">Авиационные прогнозы, матрицы Хандожко, критерии успешности, складки тропопаузы</div>
-</a>
+  <!-- 3. Теория -->
+  <a class="widget widget-accent-orange" href="/theory">
+    <div class="widget-header">
+      <span>📚 Теория и методы</span>
+      <span>Богаткин · Хандожко</span>
+    </div>
+    <ul class="widget-list">
+      <li><span>✈️ Авиационные прогнозы</span><span>K, LI, CAPE</span></li>
+      <li><span>📋 Матрицы сопряжённости</span><span>p, H, τ, v, Q</span></li>
+      <li><span>🌡 Синоптика по уровням</span><span>925–300 гПа</span></li>
+      <li><span>🌀 Тропопауза и EPV</span><span>2 PVU</span></li>
+    </ul>
+  </a>
 
-<a class="card fade-in" href="/maps" style="animation-delay: 0.20s;background:rgba(124,92,255,0.10);">
-  <span class="icon">🗺</span><b>Карта + спутник + радар</b>
-  <div class="desc">OSM · спутник · RainViewer · поиск · клик по точке</div>
-</a>
-<a class="card fade-in" href="/archive" style="animation-delay: 0.22s;background:rgba(0,229,160,0.10);">
-  <span class="icon">📂</span><b>Архив карт</b>
-  <div class="desc">Все прогоны ICON-EU и GFS за 90 дней · скачивание PNG и ZIP</div>
-</a>
-<a class="card fade-in" href="/about" style="animation-delay: 0.25s">
-  <span class="icon">ℹ️</span><b>О проекте</b>
-  <div class="desc">Источники данных, модели, метрики, библиография</div>
-</a>
+  <!-- 4. Карта -->
+  <a class="widget widget-accent-purple" href="/maps">
+    <div class="widget-header">
+      <span>🗺 Карта погоды</span>
+      <span>ICON-EU · GFS</span>
+    </div>
+    <div class="widget-title">Интерактивные слои</div>
+    <div class="widget-sub">
+      Температура · давление · ветер · осадки · облачность
+    </div>
+  </a>
 
-""" + COMMON_JS + render_top_controls() + """
+  <!-- 5. Архив -->
+  <a class="widget widget-accent-green" href="/archive">
+    <div class="widget-header">
+      <span>📂 Архив карт</span>
+      <span>90 дней</span>
+    </div>
+    <div class="widget-value small">PNG · ZIP</div>
+    <div class="widget-sub">
+      Все прогоны ICON-EU и GFS · скачивание
+    </div>
+  </a>
+
+  <!-- 6. Климат -->
+  <a class="widget widget-accent-blue" href="/climate">
+    <div class="widget-header">
+      <span>🌍 Климатические индексы</span>
+      <span>ENSO · SSW · PV</span>
+    </div>
+    <div class="widget-title">Крупномасштабные процессы</div>
+    <div class="widget-sub">
+      ONI · стратосферные потепления · полярный вихрь
+    </div>
+  </a>
+
+  <!-- 7. Библиография -->
+  <a class="widget widget-accent-orange" href="/bibliography">
+    <div class="widget-header">
+      <span>📖 Библиография</span>
+      <span>Источники</span>
+    </div>
+    <ul class="widget-list">
+      <li><span>Авиация</span><span>Богаткин</span></li>
+      <li><span>Матрицы</span><span>Хандожко</span></li>
+      <li><span>Синоптика</span><span>Хромов</span></li>
+      <li><span>Климат</span><span>IPCC AR6</span></li>
+    </ul>
+  </a>
+
+  <!-- 8. О проекте -->
+  <a class="widget widget-accent-purple" href="/about">
+    <div class="widget-header">
+      <span>ℹ️ О проекте</span>
+      <span>v1.0</span>
+    </div>
+    <div class="widget-title">weather-msk</div>
+    <div class="widget-sub">
+      Источники данных · модели · метрики · API
+    </div>
+  </a>
+
+</div>
+
+""" + COMMON_JS + """
 </body>
 </html>
 """
@@ -853,8 +1502,7 @@ ABOUT_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-
-<a class="back" href="/">← На главную</a>
+""" + render_header("about") + """
 <h1>О проекте</h1>
 <div class="sub">Источники данных, модели, метрики, библиография</div>
 
@@ -908,7 +1556,7 @@ ABOUT_HTML = """<!DOCTYPE html>
   </p>
 </div>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS + """
 </body>
 </html>
 """
@@ -959,7 +1607,7 @@ MAP_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/">← Главная</a>
+""" + render_header("maps") + """
 <h1>🗺 Карта погоды</h1>
 <div class="sub">OpenStreetMap · спутник · радар · поиск по населённым пунктам</div>
 
@@ -1080,7 +1728,7 @@ MAP_HTML = """<!DOCTYPE html>
   } catch(e) { console.warn('stations_json:', e); }
 </script>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -1150,7 +1798,7 @@ TEACHING_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>📚 Учебные примеры и методы</h1>
 <div class="sub">По учебнику О. Г. Богаткина «Авиационные прогнозы погоды» (СПб, 2010)</div>
 
@@ -1237,7 +1885,7 @@ TEACHING_HTML = """<!DOCTYPE html>
 </div>
 
 """ + render_biblio_ref("aviation", "гл. 5–12") + """
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -1395,7 +2043,7 @@ TROPOPAUSE_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>🌀 Складки тропопаузы</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ target_date }} · EPV (Ertel PV) · 2 PVU</div>
 
@@ -1563,7 +2211,7 @@ TROPOPAUSE_HTML = """<!DOCTYPE html>
 </div>
 
 """ + render_biblio_ref("dynamic") + """
-""" + COMMON_JS + render_top_controls() + render_legend("synoptic") + """
+""" + COMMON_JS +  render_legend("synoptic") + """
 </body>
 </html>
 """
@@ -1692,7 +2340,7 @@ VERIFY_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/analysis">← Анализ</a>
+""" + render_header("analysis") + """
 <h1>Проверка моделей</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · период: {{ days }} дней</div>
 
@@ -1883,7 +2531,7 @@ VERIFY_HTML = """<!DOCTYPE html>
   </a>
 </div>
 
-""" + COMMON_JS + render_top_controls() + render_legend("analysis") + """
+""" + COMMON_JS +  render_legend("analysis") + """
 </body>
 </html>
 """
@@ -1987,7 +2635,7 @@ VERIFY_HISTORY_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/verify/{{ station_key }}">← К проверке</a>
+""" + render_header("analysis") + """
 <h1>📉 История ошибок по дням</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · последние {{ days }} дней</div>
 
@@ -2077,7 +2725,7 @@ VERIFY_HISTORY_HTML = """<!DOCTYPE html>
   <div class="empty-note">Нет данных за выбранный период.</div>
 {% endif %}
 
-""" + COMMON_JS + render_top_controls() + render_legend("analysis") + """
+""" + COMMON_JS +  render_legend("analysis") + """
 </body>
 </html>
 """
@@ -2269,7 +2917,7 @@ ANALYZE_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/analysis">← Анализ</a>
+""" + render_header("analysis") + """
 <h1>Расширенный анализ</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ days }} дней</div>
 
@@ -2562,7 +3210,7 @@ ANALYZE_HTML = """<!DOCTYPE html>
   </div>
 </div>
 
-""" + COMMON_JS + render_top_controls() + render_legend("analysis") + """
+""" + COMMON_JS +  render_legend("analysis") + """
 </body>
 </html>
 """
@@ -2710,9 +3358,7 @@ AVIATION_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="{% if is_point %}/search{% else %}/theory{% endif %}">
-  ← {% if is_point %}Поиск{% else %}Теория{% endif %}
-</a>
+""" + render_header("forecast") + """
 <h1>✈️ Авиационные прогнозы</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ model_name }} · {{ days }} дня</div>
 
@@ -2896,7 +3542,7 @@ AVIATION_HTML = """<!DOCTYPE html>
 </div>
 
 """ + render_biblio_ref("aviation", "гл. 9–10") + """
-""" + COMMON_JS + render_top_controls() + render_legend("synoptic") + """
+""" + COMMON_JS +  render_legend("synoptic") + """
 </body>
 </html>
 """
@@ -3021,7 +3667,7 @@ COMPARE_MATRICES_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("analysis") + """
 <h1>🔀 Сравнение моделей по матрицам Хандожко</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ days }} дней</div>
 
@@ -3178,7 +3824,7 @@ COMPARE_MATRICES_HTML = """<!DOCTYPE html>
   </p>
 </div>
 
-""" + COMMON_JS + render_top_controls() + render_legend("matrices") + """
+""" + COMMON_JS +  render_legend("matrices") + """
 </body>
 </html>
 """
@@ -3230,9 +3876,7 @@ CHART_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="{% if is_point %}/search{% else %}/forecast{% endif %}">
-  ← {% if is_point %}Поиск{% else %}Прогноз{% endif %}
-</a>
+""" + render_header("forecast") + """
 <h1>📈 Сравнение моделей</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ days }} дней</div>
 
@@ -3344,7 +3988,7 @@ CHART_HTML = """<!DOCTYPE html>
 })();
 </script>
 
-""" + COMMON_JS + render_top_controls() + render_legend("forecast") + """
+""" + COMMON_JS +  render_legend("forecast") + """
 </body>
 </html>
 """
@@ -3362,7 +4006,8 @@ COMPARE_HTML = """<!DOCTYPE html>
 """ + BASE_STYLE + """
 </head>
 <body>
-<a class="back" href="/analysis">← Анализ</a>
+
+""" + render_header("analysis") + """
 <h1>📋 Сводка явлений</h1>
 <div style="margin: 8px 0 16px 0;">
   <a href="/compare/point" class="back" style="background:rgba(124,92,255,0.10);">🔍 Другая точка (поиск по названию)</a>
@@ -3458,7 +4103,7 @@ COMPARE_HTML = """<!DOCTYPE html>
   <div class="empty-note">Нет данных для отображения.</div>
 {% endif %}
 
-""" + COMMON_JS + render_top_controls() + render_legend("analysis") + """
+""" + COMMON_JS +  render_legend("analysis") + """
 </body>
 </html>
 """
@@ -3475,7 +4120,7 @@ MODEL_HTML = """<!DOCTYPE html>
 """ + BASE_STYLE + """
 </head>
 <body>
-<a class="back" href="/forecast">← Прогноз</a>
+""" + render_header("forecast") + """
 <h1>{{ model_name }}</h1>
 <div class="sub">Выберите станцию</div>
 
@@ -3500,7 +4145,7 @@ MODEL_HTML = """<!DOCTYPE html>
   <div class="desc">Профиль T, θ, RH на 925–300 гПа</div>
 </a>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -3604,9 +4249,7 @@ TABLE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="{% if is_point %}/search{% else %}/model/{{ model }}{% endif %}">
-  ← {% if is_point %}Поиск{% else %}{{ model_name }}{% endif %}
-</a>
+""" + render_header("forecast") + """
 <h1>{{ station }}</h1>
 <div class="sub">{{ model_name }} · {{ lat }}, {{ lon }} · прогноз на {{ days }} дня</div>
 
@@ -3732,7 +4375,7 @@ TABLE_TEMPLATE = """<!DOCTYPE html>
 <div style="color:var(--text-2);padding:20px;">Нет данных для отображения.</div>
 {% endif %}
 
-""" + COMMON_JS + render_top_controls() + render_legend("forecast") + """
+""" + COMMON_JS +  render_legend("forecast") + """
 </body>
 </html>
 """
@@ -3819,9 +4462,7 @@ TEXT_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="{% if is_point %}/forecast/point?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}{% else %}/forecast/{{ model }}/{{ station_key }}{% endif %}">
-  ← Таблица
-</a>
+""" + render_header("forecast") + """
 <h1>📝 {{ station }}</h1>
 <div class="sub">{{ model_name }} · текстовый прогноз на {{ days }} дн.</div>
 
@@ -3855,7 +4496,7 @@ TEXT_TEMPLATE = """<!DOCTYPE html>
   <a href="{% if is_point %}/point-synoptic?lat={{ lat }}&lon={{ lon }}&name={{ station }}&model={{ model }}&days={{ days }}{% else %}/synoptic/{{ model }}/{{ station_key }}?days={{ days }}{% endif %}">🌡 Синоптика</a>
 </div>
 
-""" + COMMON_JS + render_top_controls() + render_legend("forecast") + """
+""" + COMMON_JS +  render_legend("forecast") + """
 </body>
 </html>
 """
@@ -3971,7 +4612,7 @@ SEARCH_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/forecast">← Прогноз</a>
+""" + render_header("forecast") + """
 <h1>🔍 Поиск точки</h1>
 <div class="sub">Введите название населённого пункта или координаты, затем выберите, что показать</div>
 
@@ -4102,7 +4743,7 @@ SEARCH_HTML = """<!DOCTYPE html>
   }
 </script>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -4126,7 +4767,7 @@ POINT_TEMPLATE = """<!DOCTYPE html>
 <p style="color:var(--text-1);font-size:14px;line-height:1.8;">
 Раздел в разработке.
 </p>
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -4290,9 +4931,8 @@ SYNOPTIC_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="{% if is_point %}/search{% else %}/forecast{% endif %}">
-  ← {% if is_point %}Поиск{% else %}Прогноз{% endif %}
-</a>
+<body>
+""" + render_header("forecast") + """
 <h1>🌡 Синоптика по уровням</h1>
 <div class="sub">{{ station_name }} · {{ lat }}, {{ lon }} · {{ model_name }} · {{ days }} дн.</div>
 
@@ -4521,7 +5161,7 @@ SYNOPTIC_HTML = """<!DOCTYPE html>
 </script>
 
 """ + render_biblio_ref("synoptic", "гл. 3–4") + """
-""" + COMMON_JS + render_top_controls() + render_legend("synoptic") + """
+""" + COMMON_JS +  render_legend("synoptic") + """
 </body>
 </html>
 """
@@ -4639,7 +5279,7 @@ CLIMATE_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>🌍 Климатические индексы</h1>
 <div class="sub">ENSO · SSW · Полярный вихрь · период: {{ period.start }} — {{ period.end }}</div>
 
@@ -4772,7 +5412,7 @@ CLIMATE_HTML = """<!DOCTYPE html>
 </div>
 
 """ + render_biblio_ref("climate") + """
-""" + COMMON_JS + render_top_controls() + render_legend("climate") + """
+""" + COMMON_JS +  render_legend("climate") + """
 </body>
 </html>
 """
@@ -4938,7 +5578,7 @@ ALT_VERIFY_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("analysis") + """
 <h1>📋 Матрица альтернативных прогнозов</h1>
 <div class="sub">{{ title }} · {{ lat }}, {{ lon }} · {{ phenomena[phenomenon].name }} · {{ days }} дней</div>
 
@@ -5135,7 +5775,7 @@ ALT_VERIFY_HTML = """<!DOCTYPE html>
   </p>
 </div>
 
-""" + COMMON_JS + render_top_controls() + render_legend("matrices") + """
+""" + COMMON_JS +  render_legend("matrices") + """
 </body>
 </html>
 """
@@ -5255,8 +5895,7 @@ BIBLIOGRAPHY_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>📖 Библиография</h1>
 <div class="sub">Источники, использованные в разделах сайта</div>
 
@@ -5292,7 +5931,7 @@ BIBLIOGRAPHY_HTML = """<!DOCTYPE html>
 </div>
 {% endfor %}
 
-""" + COMMON_JS + render_top_controls() + render_legend("bibliography") + """
+""" + COMMON_JS +  render_legend("bibliography") + """
 </body>
 </html>
 """
@@ -5358,7 +5997,7 @@ THEORY_METHODS_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>📐 Методы прогноза</h1>
 <div class="sub">Изоэнтропический анализ · потенциальная завихрённость · PV-аномалии</div>
 
@@ -5453,7 +6092,7 @@ PV = −g · (ζ + f) · (∂θ / ∂p)
 </div>
 
 """ + render_biblio_ref("synoptic", "гл. 3–4") + """
-""" + COMMON_JS + render_top_controls() + render_legend("synoptic") + """
+""" + COMMON_JS +  render_legend("synoptic") + """
 </body>
 </html>
 """
@@ -5595,7 +6234,7 @@ THEORY_MATRICES_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>📋 Матрицы и критерии успешности</h1>
 <div class="sub">Матрица сопряжённости 2×2 · критерии Хандожко · интерпретация</div>
 
@@ -5773,7 +6412,7 @@ THEORY_MATRICES_HTML = """<!DOCTYPE html>
 </div>
 
 """ + render_biblio_ref("matrices", "гл. 2–3") + """
-""" + COMMON_JS + render_top_controls() + render_legend("matrices") + """
+""" + COMMON_JS +  render_legend("matrices") + """
 </body>
 </html>
 """
@@ -5855,7 +6494,7 @@ THEORY_INDICES_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>⚡ Индексы неустойчивости</h1>
 <div class="sub">LI · K-Index · CAPE · ΔT(850−500) · сдвиг ветра · интерпретация</div>
 
@@ -6058,7 +6697,7 @@ P = 0.25·P(K) + 0.40·P(LI) + 0.35·P(CAPE)
 </div>
 
 """ + render_biblio_ref("aviation", "гл. 9–10") + """
-""" + COMMON_JS + render_top_controls() + render_legend("synoptic") + """
+""" + COMMON_JS +  render_legend("synoptic") + """
 </body>
 </html>
 """
@@ -6221,7 +6860,7 @@ TESTS_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/theory">← Теория</a>
+""" + render_header("theory") + """
 <h1>📝 Тесты по блокам</h1>
 <div class="sub">Выбери блок — проверь знания. 20–37 вопросов, результат сразу, разбор ошибок.</div>
 
@@ -6390,7 +7029,7 @@ function escapeHtml(s) {
 }
 </script>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -6595,7 +7234,7 @@ COMPARE_POINT_HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/analysis">← Анализ</a>
+""" + render_header("analysis") + """
 <h1>📋 Сводка явлений</h1>
 <div class="sub">
   {% if station_name %}
@@ -6806,7 +7445,7 @@ COMPARE_POINT_HTML = """<!DOCTYPE html>
   }
 </script>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS +  """
 </body>
 </html>
 """
@@ -6970,7 +7609,7 @@ ARCHIVE_HTML = r"""<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/maps">← Карта (live)</a>
+""" + render_header("archive") + """
 <h1>📂 Архив прогонов</h1>
 <div class="sub">Выберите прогон слева — слои загрузятся из архива</div>
 
@@ -7181,7 +7820,7 @@ document.getElementById('download-layer').addEventListener('change', updateDownl
 loadRuns();
 </script>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS + """
 </body>
 </html>
 """
@@ -7335,8 +7974,7 @@ MAPS_HTML = r"""<!DOCTYPE html>
 </head>
 <body>
 
-<a class="back" href="/forecast">← Прогноз</a>
-<a class="back" href="/map" style="margin-left:8px;">🗺 Простая карта (OSM/спутник)</a>
+""" + render_header("maps") + """
 <h1>🗺 Карта погоды</h1>
 <div class="sub">OSM · спутник · интерактивные слои ICON-EU / GFS · поиск региона</div>
 
@@ -7662,7 +8300,7 @@ document.getElementById('step-select').addEventListener('change', updateMaps);
 updateMaps();
 </script>
 
-""" + COMMON_JS + render_top_controls() + """
+""" + COMMON_JS + """
 </body>
 </html>
 """
