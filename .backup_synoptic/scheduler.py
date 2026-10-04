@@ -30,21 +30,6 @@ ARCHIVE_RETENTION_DAYS = 90
 _scheduler = None
 
 
-def job_synoptic_maps():
-    """Генерация карт АТ каждые 6 часов."""
-    print("[scheduler] Генерация синоптических карт АТ...", flush=True)
-    try:
-        from synoptic_maps.generator import generate_at_maps
-        files = generate_at_maps(
-            levels=(500, 850),
-            steps=(0, 24),
-            regions=("nh", "europe"),
-        )
-        print(f"[scheduler] Готово: {len(files)} карт АТ", flush=True)
-    except Exception as e:
-        print(f"[scheduler] Ошибка синоптических карт: {e}", flush=True)
-
-
 def job():
     """Генерирует все карты: ICON-EU + GFS, все шаги, все поля."""
     print("[scheduler] Запуск генерации карт...", flush=True)
@@ -151,16 +136,6 @@ def init_scheduler(app=None):
         hour="*/3",
         minute=20,
         id="update_maps",
-        replace_existing=True,
-    )
-
-    # Генерация синоптических карт каждые 6 часов (в :40)
-    _scheduler.add_job(
-        job_synoptic_maps,
-        "cron",
-        hour="*/6",
-        minute=40,
-        id="synoptic_maps",
         replace_existing=True,
     )
 

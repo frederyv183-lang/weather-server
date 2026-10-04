@@ -73,10 +73,6 @@ from ui.tests import (
     TESTS_HTML,
 )
 
-from ui.synoptic_maps import (
-    SYNOPTIC_MAPS_HTML,
-)
-
 
 __all__ = [
     "BASE_STYLE",
@@ -116,5 +112,4 @@ __all__ = [
     "THEORY_INDICES_HTML",
     "BIBLIOGRAPHY_HTML",
     "TESTS_HTML",
-    "SYNOPTIC_MAPS_HTML",
 ]

@@ -53,7 +53,6 @@ from analysis.tropopause import analyze_day
 # --- карты погоды (ICON-EU + GFS, Leaflet) ---
 from maps_routes import maps_bp
 
-from synoptic_maps.routes import synoptic_maps_bp
 # ------------------------------------------------------------------
 # Логирование
 # ------------------------------------------------------------------
@@ -87,7 +86,6 @@ def date_ru_filter(iso_date):
 
 app.register_blueprint(maps_bp)
 
-app.register_blueprint(synoptic_maps_bp)
 @app.template_filter("absval")
 def absval_filter(value):
     """Безопасное абсолютное значение для старых Jinja."""

@@ -356,7 +356,6 @@ def render_header(active=""):
     items = [
         ("home",     "/",            "Главная"),
         ("forecast", "/forecast",    "Прогнозы"),
-        ("synoptic_maps", "/synoptic-maps", "Синопт. карты"),
         ("analysis", "/analysis",    "Анализ"),
         ("theory",   "/theory",      "Теория"),
         ("maps",     "/maps",        "Карты"),
