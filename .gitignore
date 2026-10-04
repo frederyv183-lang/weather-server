@@ -58,3 +58,7 @@ deepseek_*.txt
 # РќРѕ РѕСЃС‚Р°РІРёС‚СЊ README
 !README.md
 !requirements.txt
+# Бэкапы рефакторинга
+*.backup_before_split
+*.bak
+*.bak2

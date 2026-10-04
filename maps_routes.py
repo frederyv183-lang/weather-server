@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request, render_template_string
 from maps_generator import (
     generate_all_layers, MAPS_DIR, ARCHIVE_DIR, get_meta,
 )
-from templates import MAPS_HTML
+from ui import MAPS_HTML
 
 
 maps_bp = Blueprint("maps", __name__)
@@ -133,7 +133,7 @@ def api_maps_archive_files():
 @maps_bp.route("/archive")
 def archive_page():
     """Отдельная страница со списком архивных прогонов и картой."""
-    from templates import ARCHIVE_HTML
+    from ui import ARCHIVE_HTML
     meta = get_meta()
     return render_template_string(ARCHIVE_HTML, meta=meta)
 
@@ -141,7 +141,7 @@ def archive_page():
 @maps_bp.route("/archive/<stamp>")
 def archive_run(stamp):
     """Конкретный архивный прогон."""
-    from templates import ARCHIVE_HTML
+    from ui import ARCHIVE_HTML
     meta = get_meta()
     return render_template_string(ARCHIVE_HTML, meta=meta)
 

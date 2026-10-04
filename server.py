@@ -10,8 +10,8 @@ from datetime import date, timedelta
 
 from flask import Flask, render_template_string, request, jsonify
 from tests_bank import TESTS
-from templates import TESTS_HTML
-from templates import (
+from ui import TESTS_HTML
+from ui import (
     INDEX_HTML, MAP_HTML, ABOUT_HTML,
     FORECAST_HUB_HTML, ANALYSIS_HUB_HTML, THEORY_HUB_HTML,
     TROPOPAUSE_HTML, TEACHING_HTML,
