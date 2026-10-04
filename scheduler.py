@@ -31,16 +31,22 @@ _scheduler = None
 
 
 def job_synoptic_maps():
-    """Генерация карт АТ каждые 6 часов."""
+    """Генерация карт АТ с изотермами и городами + очистка архива."""
     print("[scheduler] Генерация синоптических карт АТ...", flush=True)
     try:
-        from synoptic_maps.generator import generate_at_maps
+        from synoptic_maps.generator import (
+            generate_at_maps, cleanup_old_archive,
+        )
         files = generate_at_maps(
             levels=(500, 850),
             steps=(0, 24),
             regions=("nh", "europe"),
+            overlays=("isotherms",),
+            include_ot=True,
         )
-        print(f"[scheduler] Готово: {len(files)} карт АТ", flush=True)
+        removed = cleanup_old_archive()
+        print(f"[scheduler] Готово: {len(files)} карт АТ, "
+              f"удалено старых: {removed}", flush=True)
     except Exception as e:
         print(f"[scheduler] Ошибка синоптических карт: {e}", flush=True)
 

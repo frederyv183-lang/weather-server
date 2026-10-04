@@ -62,3 +62,29 @@ deepseek_*.txt
 *.backup_before_split
 *.bak
 *.bak2
+
+# Бэкапы патчей
+.backup_*/
+*.backup_before_split
+*.backup_before_*
+templates.py.bak*
+
+# Сгенерированные карты
+static/synoptic_maps/archive/
+static/maps/archive/
+static/maps/*.png
+
+# Диагностические и одноразовые скрипты
+diag.py
+check_*.py
+check_*.py.bak
+fix_*.py
+clean_*.py
+add_*.py
+refactor_*.py
+split_templates.py
+
+# Мусор
+*.zip
+Новый текстовый документ.txt
+python

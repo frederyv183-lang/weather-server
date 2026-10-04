@@ -21,3 +21,6 @@ COPY . .
 EXPOSE 8000
 
 CMD ["gunicorn", "-b", "0.0.0.0:8000", "server:app"]
+
+# Herbie cache (для GRIB-файлов)
+ENV HERBIE_SAVE_DIR=/tmp/herbie_cache
