@@ -14,4 +14,5 @@ eccodes
 cartopy
 matplotlib
 scipy
-herbie-data
+herbie-datametpy
+siphon
