@@ -89,3 +89,8 @@ split_templates.py
 *.zip
 РќРѕРІС‹Р№ С‚РµРєСЃС‚РѕРІС‹Р№ РґРѕРєСѓРјРµРЅС‚.txt
 python
+
+# одноразовые скрипты-патчи
+add_soundings*.py
+add_mobile*.py
+*.bak

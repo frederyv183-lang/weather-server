@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Зондирование атмосферы: данные Wyoming + рендер Skew-T через MetPy."""
+"""Зондирование атмосферы: Wyoming + MetPy. Рендер Skew-T в SVG (v3)."""
 
 import io
-import base64
 from datetime import datetime, timedelta
 
 import matplotlib
@@ -11,22 +10,18 @@ import matplotlib.pyplot as plt
 
 import metpy.calc as mpcalc
 from metpy.plots import SkewT
-from metpy.units import pandas_dataframe_to_unit_arrays
+from metpy.units import units, pandas_dataframe_to_unit_arrays
 
 from siphon.simplewebservice.wyoming import WyomingUpperAir
 
 
+# v3: SVG + tooltip
+# На этих уровнях давления tooltip будет активен (иначе — «шум»)
+TOOLTIP_LEVELS = {1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100}
+
+
 def fetch_sounding(station, ts=None):
-    """
-    Получить данные зондирования для станции Wyoming.
-
-    Args:
-        station: код станции (например, 'ALB', 'BUF', 'OUN')
-        ts: время UTC (по умолчанию последний срок 00Z/12Z)
-
-    Returns:
-        pandas.DataFrame или None при ошибке
-    """
+    """Получить данные зондирования Wyoming. Возвращает DataFrame или None."""
     if ts is None:
         now = datetime.utcnow()
         if now.hour > 13:
@@ -37,7 +32,6 @@ def fetch_sounding(station, ts=None):
             ts = (now - timedelta(days=1)).replace(
                 hour=12, minute=0, second=0, microsecond=0
             )
-
     try:
         df = WyomingUpperAir.request_data(ts, station.upper())
         if df is None or df.empty:
@@ -48,9 +42,11 @@ def fetch_sounding(station, ts=None):
         return None
 
 
-def render_skewt(df):
+# v4: точные координаты через transData
+def render_skewt_svg(df, station=None, ts=None):
     """
-    Нарисовать Skew-T, вернуть PNG в base64 (без префикса data:image).
+    Рисует Skew-T и возвращает (svg_str, points).
+    Координаты hotspot-точек вычисляются через ax.transData — точно.
     """
     sounding = pandas_dataframe_to_unit_arrays(df)
 
@@ -59,34 +55,116 @@ def render_skewt(df):
     Td = sounding["dewpoint"]
     ws = sounding["speed"]
     wd = sounding["direction"]
+    h  = sounding.get("height")
+
+    rh = mpcalc.relative_humidity_from_dewpoint(T, Td).to("percent")
+    theta = mpcalc.potential_temperature(p, T).to("kelvin")
+    mixr = mpcalc.mixing_ratio_from_relative_humidity(p, T, rh).to("g/kg")
 
     u, v = mpcalc.wind_components(ws, wd)
+    ws_ms = ws.to("m/s")
+    ws_kts = ws.to("knots")
 
-    fig = plt.figure(figsize=(9, 9))
+    def wind_text(i):
+        try:
+            return "%d\u00b0 %.1f \u043c/\u0441 (%.0f \u0443\u0437)" % (
+                float(wd[i].m), float(ws_ms[i].m), float(ws_kts[i].m)
+            )
+        except Exception:
+            return "\u2014"
+
+    fig = plt.figure(figsize=(11, 11))
     skew = SkewT(fig, rotation=45)
 
-    skew.plot(p, T,  "r", linewidth=2)
-    skew.plot(p, Td, "g", linewidth=2)
-    skew.plot_barbs(p, u, v)
+    skew.plot(p, T,  "r", linewidth=2.0,
+              label="\u0422\u0435\u043c\u043f\u0435\u0440\u0430\u0442\u0443\u0440\u0430")
+    skew.plot(p, Td, "g", linewidth=2.0,
+              label="\u0422\u043e\u0447\u043a\u0430 \u0440\u043e\u0441\u044b")
+
+    step = max(1, len(p) // 12)
+    skew.plot_barbs(p[::step], u[::step], v[::step], length=6, linewidth=0.8)
 
     skew.ax.set_ylim(1000, 100)
     skew.ax.set_xlim(-40, 40)
+    skew.ax.set_xlabel("\u0422\u0435\u043c\u043f\u0435\u0440\u0430\u0442\u0443\u0440\u0430, \u00b0C", fontsize=11)
+    skew.ax.set_ylabel("\u0414\u0430\u0432\u043b\u0435\u043d\u0438\u0435, \u0433\u041f\u0430", fontsize=11)
+    skew.ax.tick_params(labelsize=10)
+    skew.ax.grid(True, linewidth=0.4, alpha=0.4)
 
     lcl_p, lcl_t = mpcalc.lcl(p[0], T[0], Td[0])
-    skew.plot(lcl_p, lcl_t, "ko", markerfacecolor="black")
+    skew.plot(lcl_p, lcl_t, "ko", markerfacecolor="black", markersize=6,
+              label="\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u043a\u043e\u043d\u0434\u0435\u043d\u0441\u0430\u0446\u0438\u0438 (LCL)")
 
     prof = mpcalc.parcel_profile(p, T[0], Td[0]).to("degC")
-    skew.plot(p, prof, "k", linewidth=2)
+    skew.plot(p, prof, "k", linewidth=2.0,
+              label="\u041f\u0443\u0442\u044c \u0447\u0430\u0441\u0442\u0438\u0446\u044b")
 
-    skew.shade_cape(p, T, prof, alpha=0.2)
-    skew.shade_cin(p, T, prof, Td, alpha=0.2)
+    skew.shade_cape(p, T, prof, alpha=0.15, label="CAPE")
+    skew.shade_cin(p, T, prof, Td, alpha=0.15, label="CIN")
 
-    skew.plot_dry_adiabats(alpha=0.3)
-    skew.plot_moist_adiabats(alpha=0.3)
-    skew.plot_mixing_lines(alpha=0.3)
+    skew.plot_dry_adiabats(alpha=0.25, linewidth=0.6)
+    skew.plot_moist_adiabats(alpha=0.25, linewidth=0.6)
+    skew.plot_mixing_lines(alpha=0.25, linewidth=0.6)
 
+    title = "Skew-T"
+    if station:
+        title += " \u2014 " + station.upper()
+    if ts is not None:
+        title += " \u2014 " + ts.strftime("%Y-%m-%d %HZ")
+    skew.ax.set_title(title, fontsize=13, pad=12)
+    skew.ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
+
+    # --- Важно: canvas.draw ДО transData и ДО savefig ---
+    fig.canvas.draw()
+
+    # Собираем точки
+    points = []
+    try:
+        bbox = skew.ax.get_window_extent()
+        x0, y0 = bbox.x0, bbox.y0
+        w, h_px = bbox.width, bbox.height
+
+        for i in range(len(p)):
+            try:
+                p_hpa = round(float(p[i].m))
+            except Exception:
+                continue
+            if p_hpa not in TOOLTIP_LEVELS:
+                continue
+
+            try:
+                T_val = float(T[i].m)
+                p_val = float(p[i].m)
+                x_px, y_px = skew.ax.transData.transform((T_val, p_val))
+                x_pct = (x_px - x0) / w * 100
+                # Y инвертируем: у CSS 0% — верх, 100% — низ
+                y_pct = (y0 + h_px - y_px) / h_px * 100
+
+                points.append({
+                    "p": int(p_hpa),
+                    "h": int(h[i].m) if h is not None else None,
+                    "T": round(float(T[i].m), 1),
+                    "Td": round(float(Td[i].m), 1),
+                    "RH": round(float(rh[i].m), 1),
+                    "theta": round(float(theta[i].m), 1),
+                    "mixr": round(float(mixr[i].m), 2),
+                    "wind": wind_text(i),
+                    "x_pct": round(x_pct, 2),
+                    "y_pct": round(y_pct, 2),
+                })
+            except Exception as e:
+                print("[soundings] point %d: %s" % (i, e))
+
+    except Exception as e:
+        print("[soundings] transData error: %s" % e)
+
+    # --- SVG ---
     buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+    plt.savefig(buf, format="svg", bbox_inches="tight")
     plt.close(fig)
     buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
+    svg_str = buf.read().decode("utf-8")
+
+    return svg_str, points
+
+

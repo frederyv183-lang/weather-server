@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Flask-приложение weather-msk.
-Маршруты и API. Шаблоны берутся из templates.py.
+Flask-РїСЂРёР»РѕР¶РµРЅРёРµ weather-msk.
+РњР°СЂС€СЂСѓС‚С‹ Рё API. РЁР°Р±Р»РѕРЅС‹ Р±РµСЂСѓС‚СЃСЏ РёР· templates.py.
 """
 
 import json
@@ -29,7 +29,7 @@ from core.dictionaries import CODE_TO_TEXT, BIBLIOGRAPHY_ITEMS
 from core.config import DEFAULT_LOCATION
 from core.http import _session
 
-# --- модули для таблицы прогноза ---
+# --- РјРѕРґСѓР»Рё РґР»СЏ С‚Р°Р±Р»РёС†С‹ РїСЂРѕРіРЅРѕР·Р° ---
 from data.forecast import fetch_forecast
 from analysis.parsing import parse_hourly, prepare_forecast_for_render
 from analysis.synoptic import analyze_synoptic
@@ -40,22 +40,22 @@ from analysis.synoptic_level import (
 )
 from analysis.climate_indices import analyze_climate
 
-# --- модули для проверки и анализа ---
+# --- РјРѕРґСѓР»Рё РґР»СЏ РїСЂРѕРІРµСЂРєРё Рё Р°РЅР°Р»РёР·Р° ---
 from data.actual import fetch_actual, check_station_availability, fetch_archive
 from analysis.statistics import analyze_period, analyze_by_day
 
-# --- модули для матриц Хандожко ---
+# --- РјРѕРґСѓР»Рё РґР»СЏ РјР°С‚СЂРёС† РҐР°РЅРґРѕР¶РєРѕ ---
 from analysis.aviation_verify import compare_all_models
 
-# --- модули для тропопаузы ---
+# --- РјРѕРґСѓР»Рё РґР»СЏ С‚СЂРѕРїРѕРїР°СѓР·С‹ ---
 from data.tropopause_data import fetch_pressure_level_data
 from analysis.tropopause import analyze_day
-# --- карты погоды (ICON-EU + GFS, Leaflet) ---
+# --- РєР°СЂС‚С‹ РїРѕРіРѕРґС‹ (ICON-EU + GFS, Leaflet) ---
 from maps_routes import maps_bp
 
 from synoptic_maps.routes import synoptic_maps_bp
 # ------------------------------------------------------------------
-# Логирование
+# Р›РѕРіРёСЂРѕРІР°РЅРёРµ
 # ------------------------------------------------------------------
 log = logging.getLogger("weather")
 logging.basicConfig(level=logging.INFO)
@@ -66,29 +66,29 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 @app.route("/static/service-worker.js")
 def service_worker():
-    """Service Worker для PWA."""
+    """Service Worker РґР»СЏ PWA."""
     return app.send_static_file("service-worker.js"), 200, {
         "Content-Type": "application/javascript",
         "Service-Worker-Allowed": "/",
     }
-# === Планировщик карт (фоновое обновление) ===
-# На Render фоновый шедулер отключён через переменную SKIP_SCHEDULER=1
+# === РџР»Р°РЅРёСЂРѕРІС‰РёРє РєР°СЂС‚ (С„РѕРЅРѕРІРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ) ===
+# РќР° Render С„РѕРЅРѕРІС‹Р№ С€РµРґСѓР»РµСЂ РѕС‚РєР»СЋС‡С‘РЅ С‡РµСЂРµР· РїРµСЂРµРјРµРЅРЅСѓСЋ SKIP_SCHEDULER=1
 import os as _os
-from data.soundings import fetch_sounding, render_skewt
+from data.soundings import fetch_sounding, render_skewt_svg
 if _os.environ.get("SKIP_SCHEDULER") != "1":
     from scheduler import init_scheduler
     init_scheduler(app)
 
 # ------------------------------------------------------------------
-# Jinja-фильтры
+# Jinja-С„РёР»СЊС‚СЂС‹
 # ------------------------------------------------------------------
 @app.template_filter("date_ru")
 def date_ru_filter(iso_date):
-    """2024-01-15 -> 'Пн, 15 января'."""
+    """2024-01-15 -> 'РџРЅ, 15 СЏРЅРІР°СЂСЏ'."""
     from datetime import datetime
-    months = ["января", "февраля", "марта", "апреля", "мая", "июня",
-              "июля", "августа", "сентября", "октября", "ноября", "декабря"]
-    weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+    months = ["СЏРЅРІР°СЂСЏ", "С„РµРІСЂР°Р»СЏ", "РјР°СЂС‚Р°", "Р°РїСЂРµР»СЏ", "РјР°СЏ", "РёСЋРЅСЏ",
+              "РёСЋР»СЏ", "Р°РІРіСѓСЃС‚Р°", "СЃРµРЅС‚СЏР±СЂСЏ", "РѕРєС‚СЏР±СЂСЏ", "РЅРѕСЏР±СЂСЏ", "РґРµРєР°Р±СЂСЏ"]
+    weekdays = ["РџРЅ", "Р’С‚", "РЎСЂ", "Р§С‚", "РџС‚", "РЎР±", "Р’СЃ"]
     try:
         d = datetime.strptime(str(iso_date)[:10], "%Y-%m-%d")
         return f"{weekdays[d.weekday()]}, {d.day} {months[d.month - 1]}"
@@ -100,7 +100,7 @@ app.register_blueprint(maps_bp)
 app.register_blueprint(synoptic_maps_bp)
 @app.template_filter("absval")
 def absval_filter(value):
-    """Безопасное абсолютное значение для старых Jinja."""
+    """Р‘РµР·РѕРїР°СЃРЅРѕРµ Р°Р±СЃРѕР»СЋС‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ РґР»СЏ СЃС‚Р°СЂС‹С… Jinja."""
     try:
         return abs(value)
     except Exception:
@@ -108,19 +108,19 @@ def absval_filter(value):
 
 
 # ------------------------------------------------------------------
-# Вспомогательная функция: построение SVG-графика
+# Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ: РїРѕСЃС‚СЂРѕРµРЅРёРµ SVG-РіСЂР°С„РёРєР°
 # ------------------------------------------------------------------
 def build_chart_svg(series, fact_series, field, unit, title,
                     decimals=1, width=1400, height=320,
                     times_labels=None, step=1):
     """
-    Строит SVG-график как строку.
+    РЎС‚СЂРѕРёС‚ SVG-РіСЂР°С„РёРє РєР°Рє СЃС‚СЂРѕРєСѓ.
 
-    series: список {key, name, color, temps, press, winds, precips}
+    series: СЃРїРёСЃРѕРє {key, name, color, temps, press, winds, precips}
     fact_series: {name, color, temps, press, winds, precips} | None
     field: 'temps' | 'press' | 'winds' | 'precips'
-    times_labels: список подписей по X
-    step: дискретность точек
+    times_labels: СЃРїРёСЃРѕРє РїРѕРґРїРёСЃРµР№ РїРѕ X
+    step: РґРёСЃРєСЂРµС‚РЅРѕСЃС‚СЊ С‚РѕС‡РµРє
     """
     all_vals = []
     for s in series:
@@ -133,9 +133,9 @@ def build_chart_svg(series, fact_series, field, unit, title,
                 all_vals.append(v)
 
     if not all_vals:
-        return '<div class="empty-note">Нет данных для отображения.</div>'
+        return '<div class="empty-note">РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ.</div>'
 
-    if unit == "гПа":
+    if unit == "РіРџР°":
         vmin = min(all_vals)
         vmax = max(all_vals)
         pad_v = (vmax - vmin) * 0.1 or 5
@@ -159,7 +159,7 @@ def build_chart_svg(series, fact_series, field, unit, title,
 
     n = len(series[0].get(field, [])) if series else 0
     if n == 0:
-        return '<div class="empty-note">Нет данных.</div>'
+        return '<div class="empty-note">РќРµС‚ РґР°РЅРЅС‹С….</div>'
     dx = plot_w / (n - 1) if n > 1 else plot_w
 
     def x(idx):
@@ -259,14 +259,14 @@ def build_chart_svg(series, fact_series, field, unit, title,
 
 
 # ------------------------------------------------------------------
-# Конфигурация
+# РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ
 # ------------------------------------------------------------------
 try:
     from core.config import STATIONS as _STATIONS
     STATIONS = _STATIONS
 except ImportError:
     STATIONS = {
-        "tushino": {"name": "Тушино", "lat": 55.85, "lon": 37.44, "key": "tushino"},
+        "tushino": {"name": "РўСѓС€РёРЅРѕ", "lat": 55.85, "lon": 37.44, "key": "tushino"},
     }
 
 try:
@@ -274,17 +274,17 @@ try:
     MODELS = _MODELS
 except ImportError:
     MODELS = {
-        "gfs":   {"name": "GFS (США)"},
-        "ecmwf": {"name": "ECMWF (Европа)"},
-        "icon":  {"name": "ICON (Германия)"},
+        "gfs":   {"name": "GFS (РЎРЁРђ)"},
+        "ecmwf": {"name": "ECMWF (Р•РІСЂРѕРїР°)"},
+        "icon":  {"name": "ICON (Р“РµСЂРјР°РЅРёСЏ)"},
     }
 
 PHENOMENA = {
-    "frost":   {"name": "Заморозок",     "unit": "°C"},
-    "wind":    {"name": "Сильный ветер", "unit": "м/с"},
-    "rain":    {"name": "Сильный дождь", "unit": "мм"},
-    "fog":     {"name": "Туман",         "unit": "км"},
-    "thunder": {"name": "Гроза",         "unit": "—"},
+    "frost":   {"name": "Р—Р°РјРѕСЂРѕР·РѕРє",     "unit": "В°C"},
+    "wind":    {"name": "РЎРёР»СЊРЅС‹Р№ РІРµС‚РµСЂ", "unit": "Рј/СЃ"},
+    "rain":    {"name": "РЎРёР»СЊРЅС‹Р№ РґРѕР¶РґСЊ", "unit": "РјРј"},
+    "fog":     {"name": "РўСѓРјР°РЅ",         "unit": "РєРј"},
+    "thunder": {"name": "Р“СЂРѕР·Р°",         "unit": "вЂ”"},
 }
 
 HISTORY_DAYS = 14
@@ -298,7 +298,7 @@ _FACT_COLOR = "#a8b4d0"
 
 
 # ------------------------------------------------------------------
-# Главные страницы
+# Р“Р»Р°РІРЅС‹Рµ СЃС‚СЂР°РЅРёС†С‹
 # ------------------------------------------------------------------
 @app.route("/")
 def index():
@@ -306,7 +306,7 @@ def index():
 
 @app.route("/tests")
 def tests_page():
-    """Страница тестов: выбор блока, прохождение, результат."""
+    """РЎС‚СЂР°РЅРёС†Р° С‚РµСЃС‚РѕРІ: РІС‹Р±РѕСЂ Р±Р»РѕРєР°, РїСЂРѕС…РѕР¶РґРµРЅРёРµ, СЂРµР·СѓР»СЊС‚Р°С‚."""
     import json as _json
     return render_template_string(
         TESTS_HTML,
@@ -335,11 +335,11 @@ def theory_hub():
 
 
 # ------------------------------------------------------------------
-# НОВЫЕ РОУТЫ: теория по группам + библиография
+# РќРћР’Р«Р• Р РћРЈРўР«: С‚РµРѕСЂРёСЏ РїРѕ РіСЂСѓРїРїР°Рј + Р±РёР±Р»РёРѕРіСЂР°С„РёСЏ
 # ------------------------------------------------------------------
 @app.route("/bibliography")
 def bibliography_page():
-    """Библиография: источники по всем разделам."""
+    """Р‘РёР±Р»РёРѕРіСЂР°С„РёСЏ: РёСЃС‚РѕС‡РЅРёРєРё РїРѕ РІСЃРµРј СЂР°Р·РґРµР»Р°Рј."""
     return render_template_string(
         BIBLIOGRAPHY_HTML,
         bibliography=BIBLIOGRAPHY_ITEMS,
@@ -348,24 +348,24 @@ def bibliography_page():
 
 @app.route("/theory/methods")
 def theory_methods():
-    """Теория: методы прогноза (изоэнтропика, PV, синоптика)."""
+    """РўРµРѕСЂРёСЏ: РјРµС‚РѕРґС‹ РїСЂРѕРіРЅРѕР·Р° (РёР·РѕСЌРЅС‚СЂРѕРїРёРєР°, PV, СЃРёРЅРѕРїС‚РёРєР°)."""
     return render_template_string(THEORY_METHODS_HTML)
 
 
 @app.route("/theory/matrices")
 def theory_matrices():
-    """Теория: матрицы сопряжённости и критерии Хандожко."""
+    """РўРµРѕСЂРёСЏ: РјР°С‚СЂРёС†С‹ СЃРѕРїСЂСЏР¶С‘РЅРЅРѕСЃС‚Рё Рё РєСЂРёС‚РµСЂРёРё РҐР°РЅРґРѕР¶РєРѕ."""
     return render_template_string(THEORY_MATRICES_HTML)
 
 
 @app.route("/theory/indices")
 def theory_indices():
-    """Теория: индексы неустойчивости и явления."""
+    """РўРµРѕСЂРёСЏ: РёРЅРґРµРєСЃС‹ РЅРµСѓСЃС‚РѕР№С‡РёРІРѕСЃС‚Рё Рё СЏРІР»РµРЅРёСЏ."""
     return render_template_string(THEORY_INDICES_HTML)
 
 
 # ------------------------------------------------------------------
-# Карта, обучение, климат
+# РљР°СЂС‚Р°, РѕР±СѓС‡РµРЅРёРµ, РєР»РёРјР°С‚
 # ------------------------------------------------------------------
 @app.route("/map")
 def map_page():
@@ -383,7 +383,7 @@ def teaching():
 
 @app.route("/climate")
 def climate_page():
-    """Климатические индексы: ENSO, SSW, PV."""
+    """РљР»РёРјР°С‚РёС‡РµСЃРєРёРµ РёРЅРґРµРєСЃС‹: ENSO, SSW, PV."""
     try:
         days_back = int(request.args.get("days", 365))
     except (TypeError, ValueError):
@@ -396,7 +396,7 @@ def climate_page():
         log.exception("climate: error: %s", e)
         return render_template_string(
             CLIMATE_HTML,
-            period={"start": "—", "end": "—"},
+            period={"start": "вЂ”", "end": "вЂ”"},
             days_back=days_back,
             enso=None, ssw=None, pv=None,
             error=str(e),
@@ -404,7 +404,7 @@ def climate_page():
 
     return render_template_string(
         CLIMATE_HTML,
-        period=data.get("period") or {"start": "—", "end": "—"},
+        period=data.get("period") or {"start": "вЂ”", "end": "вЂ”"},
         days_back=days_back,
         enso=data.get("enso"),
         ssw=data.get("ssw"),
@@ -415,7 +415,7 @@ def climate_page():
 
 @app.route("/search")
 def search():
-    """Поиск точки: geocoding или координаты."""
+    """РџРѕРёСЃРє С‚РѕС‡РєРё: geocoding РёР»Рё РєРѕРѕСЂРґРёРЅР°С‚С‹."""
     return render_template_string(
         SEARCH_HTML,
         models=MODELS,
@@ -427,7 +427,7 @@ def search():
 
 @app.route("/tropopause")
 def tropopause_page():
-    """Складки тропопаузы: EPV, 2 PVU, профиль."""
+    """РЎРєР»Р°РґРєРё С‚СЂРѕРїРѕРїР°СѓР·С‹: EPV, 2 PVU, РїСЂРѕС„РёР»СЊ."""
     station_key = request.args.get("station", "domodedovo")
     if station_key not in STATIONS:
         station_key = next(iter(STATIONS))
@@ -445,7 +445,7 @@ def tropopause_page():
     try:
         raw = fetch_pressure_level_data(lat, lon, target_date)
     except Exception as e:
-        log.exception("tropopause: ошибка данных: %s", e)
+        log.exception("tropopause: РѕС€РёР±РєР° РґР°РЅРЅС‹С…: %s", e)
         return render_template_string(
             TROPOPAUSE_HTML,
             station_key=station_key,
@@ -463,7 +463,7 @@ def tropopause_page():
     try:
         day_result = analyze_day(raw, lat, lon)
     except Exception as e:
-        log.exception("tropopause: ошибка анализа: %s", e)
+        log.exception("tropopause: РѕС€РёР±РєР° Р°РЅР°Р»РёР·Р°: %s", e)
         return render_template_string(
             TROPOPAUSE_HTML,
             station_key=station_key,
@@ -506,12 +506,12 @@ def tropopause_page():
 
 
 # ------------------------------------------------------------------
-# Модели и станции
+# РњРѕРґРµР»Рё Рё СЃС‚Р°РЅС†РёРё
 # ------------------------------------------------------------------
 @app.route("/model/<model_key>")
 def model_page(model_key):
     if model_key not in MODELS:
-        return "Модель не найдена", 404
+        return "РњРѕРґРµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°", 404
     first = next(iter(STATIONS))
     return render_template_string(
         MODEL_HTML,
@@ -523,15 +523,15 @@ def model_page(model_key):
 
 
 # ------------------------------------------------------------------
-# Таблица прогноза
+# РўР°Р±Р»РёС†Р° РїСЂРѕРіРЅРѕР·Р°
 # ------------------------------------------------------------------
 @app.route("/forecast/<model_key>/<station_key>")
 def forecast_table(model_key, station_key):
-    """Таблица прогноза по модели и станции."""
+    """РўР°Р±Р»РёС†Р° РїСЂРѕРіРЅРѕР·Р° РїРѕ РјРѕРґРµР»Рё Рё СЃС‚Р°РЅС†РёРё."""
     if model_key not in MODELS:
-        return "Модель не найдена", 404
+        return "РњРѕРґРµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°", 404
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -548,7 +548,7 @@ def forecast_table(model_key, station_key):
         by_day = prepare_forecast_for_render(forecast)
         events = analyze_synoptic(forecast)
     except Exception as e:
-        log.exception("Ошибка при получении прогноза: %s", e)
+        log.exception("РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё РїСЂРѕРіРЅРѕР·Р°: %s", e)
         return render_template_string(
             TABLE_TEMPLATE,
             model=model_key,
@@ -594,11 +594,11 @@ def forecast_table(model_key, station_key):
 
 @app.route("/text/<model_key>/<station_key>")
 def forecast_text(model_key, station_key):
-    """Текстовый прогноз по модели и станции."""
+    """РўРµРєСЃС‚РѕРІС‹Р№ РїСЂРѕРіРЅРѕР· РїРѕ РјРѕРґРµР»Рё Рё СЃС‚Р°РЅС†РёРё."""
     if model_key not in MODELS:
-        return "Модель не найдена", 404
+        return "РњРѕРґРµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°", 404
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -620,7 +620,7 @@ def forecast_text(model_key, station_key):
         raw = fetch_forecast(model_key, lat, lon, days=days)
         forecast = parse_hourly(raw)
     except Exception as e:
-        log.exception("forecast_text: ошибка прогноза: %s", e)
+        log.exception("forecast_text: РѕС€РёР±РєР° РїСЂРѕРіРЅРѕР·Р°: %s", e)
         return render_template_string(
             TEXT_TEMPLATE,
             model=model_key,
@@ -631,7 +631,7 @@ def forecast_text(model_key, station_key):
             days=days,
             model_switcher=model_switcher,
             days_options=[1, 3, 5, 7],
-            text=f"Не удалось загрузить прогноз: {e}",
+            text=f"РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїСЂРѕРіРЅРѕР·: {e}",
             error=str(e),
             is_point=False,
         )
@@ -639,8 +639,8 @@ def forecast_text(model_key, station_key):
     try:
         text = generate_text_forecast(model_name, station_name, forecast)
     except Exception as e:
-        log.exception("forecast_text: ошибка генерации текста: %s", e)
-        text = f"Ошибка генерации текста: {e}"
+        log.exception("forecast_text: РѕС€РёР±РєР° РіРµРЅРµСЂР°С†РёРё С‚РµРєСЃС‚Р°: %s", e)
+        text = f"РћС€РёР±РєР° РіРµРЅРµСЂР°С†РёРё С‚РµРєСЃС‚Р°: {e}"
 
     return render_template_string(
         TEXT_TEMPLATE,
@@ -659,13 +659,13 @@ def forecast_text(model_key, station_key):
 
 
 # ------------------------------------------------------------------
-# График сравнения моделей (станция)
+# Р“СЂР°С„РёРє СЃСЂР°РІРЅРµРЅРёСЏ РјРѕРґРµР»РµР№ (СЃС‚Р°РЅС†РёСЏ)
 # ------------------------------------------------------------------
 @app.route("/chart/<station_key>")
 def chart_page(station_key):
-    """Сравнение моделей на графике: T, P, ветер, осадки."""
+    """РЎСЂР°РІРЅРµРЅРёРµ РјРѕРґРµР»РµР№ РЅР° РіСЂР°С„РёРєРµ: T, P, РІРµС‚РµСЂ, РѕСЃР°РґРєРё."""
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -731,7 +731,7 @@ def chart_page(station_key):
             times=[], times_labels=[], days_list=[],
             series=[], fact_series=None,
             svg_temps="", svg_press="", svg_winds="", svg_prec="",
-            error="Не удалось загрузить прогнозы. Попробуйте позже.",
+            error="РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїСЂРѕРіРЅРѕР·С‹. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.",
             is_point=False,
         )
 
@@ -784,12 +784,12 @@ def chart_page(station_key):
 
             if any(v is not None for v in f_temps):
                 fact_series = {
-                    "name": "ERA5 (факт)", "color": _FACT_COLOR,
+                    "name": "ERA5 (С„Р°РєС‚)", "color": _FACT_COLOR,
                     "temps": f_temps, "press": f_press,
                     "winds": f_winds, "precips": f_precips,
                 }
     except Exception as e:
-        log.warning("chart_page: ERA5 не загружен: %s", e)
+        log.warning("chart_page: ERA5 РЅРµ Р·Р°РіСЂСѓР¶РµРЅ: %s", e)
 
     days_map = {}
     for i, t in enumerate(times_global):
@@ -802,13 +802,13 @@ def chart_page(station_key):
     days_list = list(days_map.values())
     times_labels = [t[11:16] for t in times_global]
 
-    svg_temps = build_chart_svg(series, fact_series, "temps", "°C", "Температура",
+    svg_temps = build_chart_svg(series, fact_series, "temps", "В°C", "РўРµРјРїРµСЂР°С‚СѓСЂР°",
                                 decimals=1, times_labels=times_labels, step=step)
-    svg_press = build_chart_svg(series, fact_series, "press", "гПа", "Давление",
+    svg_press = build_chart_svg(series, fact_series, "press", "РіРџР°", "Р”Р°РІР»РµРЅРёРµ",
                                 decimals=0, times_labels=times_labels, step=step)
-    svg_winds = build_chart_svg(series, fact_series, "winds", "м/с", "Ветер",
+    svg_winds = build_chart_svg(series, fact_series, "winds", "Рј/СЃ", "Р’РµС‚РµСЂ",
                                 decimals=0, times_labels=times_labels, step=step)
-    svg_prec  = build_chart_svg(series, fact_series, "precips", "мм", "Осадки",
+    svg_prec  = build_chart_svg(series, fact_series, "precips", "РјРј", "РћСЃР°РґРєРё",
                                 decimals=2, times_labels=times_labels, step=step)
 
     return render_template_string(
@@ -846,12 +846,12 @@ def compare_page(station_key):
     )
 @app.route("/compare/point")
 def compare_point():
-    """Сводка явлений для произвольной точки (по координатам или названию)."""
+    """РЎРІРѕРґРєР° СЏРІР»РµРЅРёР№ РґР»СЏ РїСЂРѕРёР·РІРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё (РїРѕ РєРѕРѕСЂРґРёРЅР°С‚Р°Рј РёР»Рё РЅР°Р·РІР°РЅРёСЋ)."""
     lat = request.args.get("lat", type=float)
     lon = request.args.get("lon", type=float)
     name = request.args.get("name", "").strip()
 
-    # Если координаты не переданы — показываем только форму поиска
+    # Р•СЃР»Рё РєРѕРѕСЂРґРёРЅР°С‚С‹ РЅРµ РїРµСЂРµРґР°РЅС‹ вЂ” РїРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ С„РѕСЂРјСѓ РїРѕРёСЃРєР°
     if lat is None or lon is None:
         return render_template_string(
             COMPARE_POINT_HTML,
@@ -877,14 +877,14 @@ def compare_point():
         days = 5
     days = max(1, min(days, 7))
 
-    # Явления — те же, что в compare_page
+    # РЇРІР»РµРЅРёСЏ вЂ” С‚Рµ Р¶Рµ, С‡С‚Рѕ РІ compare_page
     PHENOMENA_LIST = [
-        ("fog",     "Туман",         "🌫", lambda h: h.get("weather_code") in (45, 48)),
-        ("thunder", "Гроза",         "⚡", lambda h: h.get("weather_code") in (95, 96, 99)),
-        ("rain",    "Осадки",        "🌧", lambda h: (h.get("precipitation_mm") or 0) > 0.05),
-        ("snow",    "Снег",          "❄️", lambda h: h.get("weather_code") in (71, 73, 75, 77, 85, 86)),
-        ("frost",   "Заморозок",     "🥶", lambda h: h.get("temp_c") is not None and h.get("temp_c") < 0),
-        ("wind",    "Сильный ветер", "💨", lambda h: (h.get("wind_ms") or 0) >= 12.0),
+        ("fog",     "РўСѓРјР°РЅ",         "рџЊ«", lambda h: h.get("weather_code") in (45, 48)),
+        ("thunder", "Р“СЂРѕР·Р°",         "вљЎ", lambda h: h.get("weather_code") in (95, 96, 99)),
+        ("rain",    "РћСЃР°РґРєРё",        "рџЊ§", lambda h: (h.get("precipitation_mm") or 0) > 0.05),
+        ("snow",    "РЎРЅРµРі",          "вќ„пёЏ", lambda h: h.get("weather_code") in (71, 73, 75, 77, 85, 86)),
+        ("frost",   "Р—Р°РјРѕСЂРѕР·РѕРє",     "рџҐ¶", lambda h: h.get("temp_c") is not None and h.get("temp_c") < 0),
+        ("wind",    "РЎРёР»СЊРЅС‹Р№ РІРµС‚РµСЂ", "рџ’Ё", lambda h: (h.get("wind_ms") or 0) >= 12.0),
     ]
 
     results = []
@@ -942,11 +942,11 @@ def compare_point():
     )
 
 # ------------------------------------------------------------------
-# Точка: таблица, текст, авиация, график
+# РўРѕС‡РєР°: С‚Р°Р±Р»РёС†Р°, С‚РµРєСЃС‚, Р°РІРёР°С†РёСЏ, РіСЂР°С„РёРє
 # ------------------------------------------------------------------
 @app.route("/forecast/point")
 def forecast_point():
-    """Таблица прогноза для произвольной точки."""
+    """РўР°Р±Р»РёС†Р° РїСЂРѕРіРЅРѕР·Р° РґР»СЏ РїСЂРѕРёР·РІРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё."""
     lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
     lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
     name = request.args.get("name", DEFAULT_LOCATION["name"])
@@ -1012,7 +1012,7 @@ def forecast_point():
 
 @app.route("/point-text")
 def point_text():
-    """Текстовый прогноз для произвольной точки."""
+    """РўРµРєСЃС‚РѕРІС‹Р№ РїСЂРѕРіРЅРѕР· РґР»СЏ РїСЂРѕРёР·РІРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё."""
     lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
     lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
     name = request.args.get("name", DEFAULT_LOCATION["name"])
@@ -1039,7 +1039,7 @@ def point_text():
         text = generate_text_forecast(model_name, name, forecast)
     except Exception as e:
         log.exception("point_text error: %s", e)
-        text = f"Не удалось сгенерировать прогноз: {e}"
+        text = f"РќРµ СѓРґР°Р»РѕСЃСЊ СЃРіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ РїСЂРѕРіРЅРѕР·: {e}"
 
     return render_template_string(
         TEXT_TEMPLATE,
@@ -1059,7 +1059,7 @@ def point_text():
 
 @app.route("/point-aviation")
 def point_aviation():
-    """Авиационный прогноз для произвольной точки."""
+    """РђРІРёР°С†РёРѕРЅРЅС‹Р№ РїСЂРѕРіРЅРѕР· РґР»СЏ РїСЂРѕРёР·РІРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё."""
     lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
     lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
     name = request.args.get("name", DEFAULT_LOCATION["name"])
@@ -1106,10 +1106,10 @@ def point_aviation():
         "hours_total": 0,
         "thunder_hours": 0,
         "thunder_max_prob": 0,
-        "thunder_max_level": "нет",
+        "thunder_max_level": "РЅРµС‚",
         "fog_hours": 0,
         "fog_max_prob": 0,
-        "fog_max_level": "нет",
+        "fog_max_level": "РЅРµС‚",
         "k_max": None,
         "li_min": None,
         "cape_max": None,
@@ -1119,18 +1119,18 @@ def point_aviation():
         summary["hours_total"] += 1
 
         avt = h.get("av_thunder") or {}
-        if avt.get("combined_level") and avt["combined_level"] not in ("нет", "нет данных"):
+        if avt.get("combined_level") and avt["combined_level"] not in ("РЅРµС‚", "РЅРµС‚ РґР°РЅРЅС‹С…"):
             summary["thunder_hours"] += 1
         if avt.get("combined_prob") and avt["combined_prob"] > summary["thunder_max_prob"]:
             summary["thunder_max_prob"] = avt["combined_prob"]
-            summary["thunder_max_level"] = avt.get("combined_level", "нет")
+            summary["thunder_max_level"] = avt.get("combined_level", "РЅРµС‚")
 
         avf = h.get("av_fog") or {}
-        if avf.get("level") and avf["level"] not in ("нет", "нет данных"):
+        if avf.get("level") and avf["level"] not in ("РЅРµС‚", "РЅРµС‚ РґР°РЅРЅС‹С…"):
             summary["fog_hours"] += 1
         if avf.get("probability") and avf["probability"] > summary["fog_max_prob"]:
             summary["fog_max_prob"] = avf["probability"]
-            summary["fog_max_level"] = avf.get("level", "нет")
+            summary["fog_max_level"] = avf.get("level", "РЅРµС‚")
 
         if avt.get("k") is not None:
             if summary["k_max"] is None or avt["k"] > summary["k_max"]:
@@ -1165,7 +1165,7 @@ def point_aviation():
 
 @app.route("/point-chart")
 def point_chart():
-    """Сравнение моделей на графике для произвольной точки."""
+    """РЎСЂР°РІРЅРµРЅРёРµ РјРѕРґРµР»РµР№ РЅР° РіСЂР°С„РёРєРµ РґР»СЏ РїСЂРѕРёР·РІРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё."""
     lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
     lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
     name = request.args.get("name", DEFAULT_LOCATION["name"])
@@ -1230,7 +1230,7 @@ def point_chart():
             times=[], times_labels=[], days_list=[],
             series=[], fact_series=None,
             svg_temps="", svg_press="", svg_winds="", svg_prec="",
-            error="Не удалось загрузить прогнозы. Попробуйте позже.",
+            error="РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїСЂРѕРіРЅРѕР·С‹. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.",
             is_point=True,
         )
 
@@ -1283,12 +1283,12 @@ def point_chart():
 
             if any(v is not None for v in f_temps):
                 fact_series = {
-                    "name": "ERA5 (факт)", "color": _FACT_COLOR,
+                    "name": "ERA5 (С„Р°РєС‚)", "color": _FACT_COLOR,
                     "temps": f_temps, "press": f_press,
                     "winds": f_winds, "precips": f_precips,
                 }
     except Exception as e:
-        log.warning("point_chart: ERA5 не загружен: %s", e)
+        log.warning("point_chart: ERA5 РЅРµ Р·Р°РіСЂСѓР¶РµРЅ: %s", e)
 
     days_map = {}
     for i, t in enumerate(times_global):
@@ -1301,13 +1301,13 @@ def point_chart():
     days_list = list(days_map.values())
     times_labels = [t[11:16] for t in times_global]
 
-    svg_temps = build_chart_svg(series, fact_series, "temps", "°C", "Температура",
+    svg_temps = build_chart_svg(series, fact_series, "temps", "В°C", "РўРµРјРїРµСЂР°С‚СѓСЂР°",
                                 decimals=1, times_labels=times_labels, step=step)
-    svg_press = build_chart_svg(series, fact_series, "press", "гПа", "Давление",
+    svg_press = build_chart_svg(series, fact_series, "press", "РіРџР°", "Р”Р°РІР»РµРЅРёРµ",
                                 decimals=0, times_labels=times_labels, step=step)
-    svg_winds = build_chart_svg(series, fact_series, "winds", "м/с", "Ветер",
+    svg_winds = build_chart_svg(series, fact_series, "winds", "Рј/СЃ", "Р’РµС‚РµСЂ",
                                 decimals=0, times_labels=times_labels, step=step)
-    svg_prec  = build_chart_svg(series, fact_series, "precips", "мм", "Осадки",
+    svg_prec  = build_chart_svg(series, fact_series, "precips", "РјРј", "РћСЃР°РґРєРё",
                                 decimals=2, times_labels=times_labels, step=step)
 
     return render_template_string(
@@ -1337,15 +1337,15 @@ def point_chart():
 
 
 # ------------------------------------------------------------------
-# СИНОПТИКА ПО УРОВНЯМ
+# РЎРРќРћРџРўРРљРђ РџРћ РЈР РћР’РќРЇРњ
 # ------------------------------------------------------------------
 @app.route("/synoptic/<model_key>/<station_key>")
 def synoptic_station(model_key, station_key):
-    """Синоптический анализ по уровням для станции."""
+    """РЎРёРЅРѕРїС‚РёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР· РїРѕ СѓСЂРѕРІРЅСЏРј РґР»СЏ СЃС‚Р°РЅС†РёРё."""
     if model_key not in MODELS:
-        return "Модель не найдена", 404
+        return "РњРѕРґРµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°", 404
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -1418,7 +1418,7 @@ def synoptic_station(model_key, station_key):
 
 @app.route("/point-synoptic")
 def synoptic_point():
-    """Синоптический анализ по уровням для точки."""
+    """РЎРёРЅРѕРїС‚РёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР· РїРѕ СѓСЂРѕРІРЅСЏРј РґР»СЏ С‚РѕС‡РєРё."""
     lat = request.args.get("lat", type=float, default=DEFAULT_LOCATION["lat"])
     lon = request.args.get("lon", type=float, default=DEFAULT_LOCATION["lon"])
     name = request.args.get("name", DEFAULT_LOCATION["name"])
@@ -1493,13 +1493,13 @@ def synoptic_point():
 
 
 # ------------------------------------------------------------------
-# Проверка моделей
+# РџСЂРѕРІРµСЂРєР° РјРѕРґРµР»РµР№
 # ------------------------------------------------------------------
 @app.route("/verify/<station_key>")
 def verify_page(station_key):
-    """Сравнение моделей с фактом за N дней."""
+    """РЎСЂР°РІРЅРµРЅРёРµ РјРѕРґРµР»РµР№ СЃ С„Р°РєС‚РѕРј Р·Р° N РґРЅРµР№."""
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -1559,9 +1559,9 @@ def verify_page(station_key):
 
 @app.route("/verify/<station_key>/history")
 def verify_history_page(station_key):
-    """История ошибок по дням: MAE и Bias для каждой модели."""
+    """РСЃС‚РѕСЂРёСЏ РѕС€РёР±РѕРє РїРѕ РґРЅСЏРј: MAE Рё Bias РґР»СЏ РєР°Р¶РґРѕР№ РјРѕРґРµР»Рё."""
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -1629,9 +1629,9 @@ def verify_history_page(station_key):
     bias_series = build_series("bias")
     rmse_series = build_series("rmse")
 
-    svg_mae  = build_chart_svg(mae_series,  None, "mae",  "°C", "MAE по дням",  decimals=2)
-    svg_bias = build_chart_svg(bias_series, None, "bias", "°C", "Bias по дням", decimals=2)
-    svg_rmse = build_chart_svg(rmse_series, None, "rmse", "°C", "RMSE по дням", decimals=2)
+    svg_mae  = build_chart_svg(mae_series,  None, "mae",  "В°C", "MAE РїРѕ РґРЅСЏРј",  decimals=2)
+    svg_bias = build_chart_svg(bias_series, None, "bias", "В°C", "Bias РїРѕ РґРЅСЏРј", decimals=2)
+    svg_rmse = build_chart_svg(rmse_series, None, "rmse", "В°C", "RMSE РїРѕ РґРЅСЏРј", decimals=2)
 
     table_rows = []
     for date in dates_union:
@@ -1671,13 +1671,13 @@ def verify_history_page(station_key):
 
 
 # ------------------------------------------------------------------
-# Расширенный анализ
+# Р Р°СЃС€РёСЂРµРЅРЅС‹Р№ Р°РЅР°Р»РёР·
 # ------------------------------------------------------------------
 @app.route("/analyze/<station_key>")
 def analyze_page(station_key):
-    """Расширенный анализ: детальная статистика + по дням."""
+    """Р Р°СЃС€РёСЂРµРЅРЅС‹Р№ Р°РЅР°Р»РёР·: РґРµС‚Р°Р»СЊРЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР° + РїРѕ РґРЅСЏРј."""
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -1748,15 +1748,15 @@ def analyze_page(station_key):
 
 
 # ------------------------------------------------------------------
-# Авиация (станция)
+# РђРІРёР°С†РёСЏ (СЃС‚Р°РЅС†РёСЏ)
 # ------------------------------------------------------------------
 @app.route("/aviation/<model_key>/<station_key>")
 def aviation_page(model_key, station_key):
-    """Авиационные прогнозы: Вайтинг, LI, CAPE, туман по Кирюхину."""
+    """РђРІРёР°С†РёРѕРЅРЅС‹Рµ РїСЂРѕРіРЅРѕР·С‹: Р’Р°Р№С‚РёРЅРі, LI, CAPE, С‚СѓРјР°РЅ РїРѕ РљРёСЂСЋС…РёРЅСѓ."""
     if model_key not in MODELS:
-        return "Модель не найдена", 404
+        return "РњРѕРґРµР»СЊ РЅРµ РЅР°Р№РґРµРЅР°", 404
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -1779,7 +1779,7 @@ def aviation_page(model_key, station_key):
         forecast = parse_hourly(raw)
         by_day = prepare_forecast_for_render(forecast)
     except Exception as e:
-        log.exception("aviation_page: ошибка прогноза: %s", e)
+        log.exception("aviation_page: РѕС€РёР±РєР° РїСЂРѕРіРЅРѕР·Р°: %s", e)
         return render_template_string(
             AVIATION_HTML,
             model=model_key,
@@ -1800,10 +1800,10 @@ def aviation_page(model_key, station_key):
         "hours_total": 0,
         "thunder_hours": 0,
         "thunder_max_prob": 0,
-        "thunder_max_level": "нет",
+        "thunder_max_level": "РЅРµС‚",
         "fog_hours": 0,
         "fog_max_prob": 0,
-        "fog_max_level": "нет",
+        "fog_max_level": "РЅРµС‚",
         "k_max": None,
         "li_min": None,
         "cape_max": None,
@@ -1813,18 +1813,18 @@ def aviation_page(model_key, station_key):
         summary["hours_total"] += 1
 
         avt = h.get("av_thunder") or {}
-        if avt.get("combined_level") and avt["combined_level"] not in ("нет", "нет данных"):
+        if avt.get("combined_level") and avt["combined_level"] not in ("РЅРµС‚", "РЅРµС‚ РґР°РЅРЅС‹С…"):
             summary["thunder_hours"] += 1
         if avt.get("combined_prob") and avt["combined_prob"] > summary["thunder_max_prob"]:
             summary["thunder_max_prob"] = avt["combined_prob"]
-            summary["thunder_max_level"] = avt.get("combined_level", "нет")
+            summary["thunder_max_level"] = avt.get("combined_level", "РЅРµС‚")
 
         avf = h.get("av_fog") or {}
-        if avf.get("level") and avf["level"] not in ("нет", "нет данных"):
+        if avf.get("level") and avf["level"] not in ("РЅРµС‚", "РЅРµС‚ РґР°РЅРЅС‹С…"):
             summary["fog_hours"] += 1
         if avf.get("probability") and avf["probability"] > summary["fog_max_prob"]:
             summary["fog_max_prob"] = avf["probability"]
-            summary["fog_max_level"] = avf.get("level", "нет")
+            summary["fog_max_level"] = avf.get("level", "РЅРµС‚")
 
         if avt.get("k") is not None:
             if summary["k_max"] is None or avt["k"] > summary["k_max"]:
@@ -1858,14 +1858,14 @@ def aviation_page(model_key, station_key):
 
 
 # ------------------------------------------------------------------
-# Матрица альтернативных прогнозов
+# РњР°С‚СЂРёС†Р° Р°Р»СЊС‚РµСЂРЅР°С‚РёРІРЅС‹С… РїСЂРѕРіРЅРѕР·РѕРІ
 # ------------------------------------------------------------------
 @app.route("/alt-verify")
 def alt_verify_point():
-    """Бинарная верификация явлений по точке."""
+    """Р‘РёРЅР°СЂРЅР°СЏ РІРµСЂРёС„РёРєР°С†РёСЏ СЏРІР»РµРЅРёР№ РїРѕ С‚РѕС‡РєРµ."""
     lat = request.args.get("lat", type=float, default=55.75)
     lon = request.args.get("lon", type=float, default=37.62)
-    name = request.args.get("name", "Точка")
+    name = request.args.get("name", "РўРѕС‡РєР°")
 
     phenomenon = request.args.get("phenomenon", "fog")
     if phenomenon not in PHENOMENA:
@@ -1907,9 +1907,9 @@ def alt_verify_point():
 
 @app.route("/alt-verify/<station_key>")
 def alt_verify_station(station_key):
-    """Бинарная верификация явлений по станции."""
+    """Р‘РёРЅР°СЂРЅР°СЏ РІРµСЂРёС„РёРєР°С†РёСЏ СЏРІР»РµРЅРёР№ РїРѕ СЃС‚Р°РЅС†РёРё."""
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -1955,9 +1955,9 @@ def alt_verify_station(station_key):
 
 @app.route("/compare-matrices/<station_key>")
 def compare_matrices_page(station_key):
-    """Сравнение моделей по матрицам Хандожко для всех явлений."""
+    """РЎСЂР°РІРЅРµРЅРёРµ РјРѕРґРµР»РµР№ РїРѕ РјР°С‚СЂРёС†Р°Рј РҐР°РЅРґРѕР¶РєРѕ РґР»СЏ РІСЃРµС… СЏРІР»РµРЅРёР№."""
     if station_key not in STATIONS:
-        return "Станция не найдена", 404
+        return "РЎС‚Р°РЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°", 404
 
     s = STATIONS[station_key]
     lat, lon = s["lat"], s["lon"]
@@ -2007,7 +2007,7 @@ def compare_matrices_page(station_key):
 # ------------------------------------------------------------------
 @app.route("/api/geocode")
 def api_geocode():
-    """Реальный geocoding через Open-Meteo Geocoding API."""
+    """Р РµР°Р»СЊРЅС‹Р№ geocoding С‡РµСЂРµР· Open-Meteo Geocoding API."""
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify({"results": []})
@@ -2060,32 +2060,32 @@ def api_verify(station_key):
 
 @app.route("/api/verify/<station_key>/history")
 def api_verify_history(station_key):
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 @app.route("/api/analyze/<station_key>")
 def api_analyze(station_key):
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 @app.route("/api/aviation/<model_key>/<station_key>")
 def api_aviation(model_key, station_key):
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 @app.route("/api/alt-verify")
 def api_alt_verify():
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 @app.route("/api/compare-matrices")
 def api_compare_matrices():
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 @app.route("/api/tropopause")
 def api_tropopause():
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 @app.route("/api/noaa/nearby")
@@ -2095,19 +2095,213 @@ def api_noaa_nearby():
 
 @app.route("/api/noaa/historical")
 def api_noaa_historical():
-    return jsonify({"error": "Не реализовано"})
+    return jsonify({"error": "РќРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ"})
 
 
 # ------------------------------------------------------------------
 
 
-@app.route("/sounding/<station>")
+# === Skew-T: РјР°СЂС€СЂСѓС‚ СЃ SVG + tooltip (v3) ===
+
+
+# SOUNDING_VIEW_FSTRING_V3_1
 def sounding_view(station):
-    """Страница Skew-T диаграммы для станции зондирования."""
+    """Страница Skew-T: SVG-диаграмма + tooltip. Без Jinja2 (f-string)."""
+    import json as _json
+
+    df = fetch_sounding(station.upper())
+    if df is None:
+        return f"<h1>Нет данных для станции {station.upper()}</h1>", 404
+
+    svg, points = render_skewt_svg(df, station=station.upper(), ts=None)
+    points_json = _json.dumps(points, ensure_ascii=False)
+
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skew-T — {station.upper()}</title>
+<style>
+  html, body {{
+    margin: 0; padding: 0; background: #0a0e1a; color: #e8eefc;
+    font-family: 'Inter', -apple-system, sans-serif;
+  }}
+  .wrap {{
+    max-width: 1200px; margin: 0 auto; padding: 20px;
+  }}
+  .head {{
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 16px;
+  }}
+  .head h1 {{ margin: 0; font-size: 20px; }}
+  .head a {{
+    color: #4dabff; text-decoration: none; font-size: 13px;
+    padding: 6px 12px; border-radius: 8px;
+    background: rgba(77,171,255,0.08);
+    border: 1px solid rgba(77,171,255,0.2);
+  }}
+  .head a:hover {{ background: rgba(77,171,255,0.15); }}
+  .skew-wrap {{
+    position: relative;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 20px 40px -20px rgba(77,171,255,0.4);
+  }}
+  .skew-wrap svg {{
+    display: block; width: 100%; height: auto;
+  }}
+  .skew-wrap .hotspot {{
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgba(77,171,255,0);
+    border: 1px solid rgba(77,171,255,0);
+    cursor: crosshair;
+    transition: background 0.15s, border-color 0.15s;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    z-index: 5;
+  }}
+  .skew-wrap .hotspot:hover {{
+    background: rgba(77,171,255,0.35);
+    border-color: rgba(77,171,255,0.9);
+  }}
+  .tooltip {{
+    position: fixed;
+    pointer-events: none;
+    z-index: 10000;
+    background: rgba(10,14,26,0.97);
+    border: 1px solid rgba(120,160,255,0.4);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #e8eefc;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    display: none;
+    white-space: nowrap;
+    line-height: 1.75;
+    min-width: 210px;
+  }}
+  .tooltip .tt-title {{
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: #4dabff;
+    margin-bottom: 6px;
+  }}
+  .tooltip .tt-row {{
+    display: flex; justify-content: space-between; gap: 16px;
+  }}
+  .tooltip .tt-row span:first-child {{ color: #8892b0; }}
+  .tooltip .tt-row span:last-child {{ font-weight: 600; }}
+  .tooltip .tt-cold {{ color: #6bb6ff; }}
+  .tooltip .tt-warm {{ color: #ffb547; }}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <a href="/">← На главную</a>
+    <h1>Skew-T — {station.upper()}</h1>
+  </div>
+  <div class="skew-wrap" id="skew-wrap">
+    {svg}
+  </div>
+</div>
+<div class="tooltip" id="tt"></div>
+<script>
+(function() {{
+  var POINTS = {points_json};
+  var wrap = document.getElementById('skew-wrap');
+  var tt = document.getElementById('tt');
+
+  function pct_y(p_hpa) {{
+    var p0 = 1000, p1 = 100;
+    var v = (Math.log(p0) - Math.log(p_hpa)) / (Math.log(p0) - Math.log(p1));
+    return v * 100;
+  }}
+
+  document.addEventListener('mousemove', function(e) {{
+    if (tt.style.display !== 'block') return;
+    var pad = 14;
+    var x = e.clientX + pad, y = e.clientY + pad;
+    if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - pad;
+    if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - pad;
+    tt.style.left = x + 'px';
+    tt.style.top = y + 'px';
+  }});
+
+  function row(lbl, val, cls) {{
+    cls = cls || '';
+    return '<div class="tt-row"><span>' + lbl
+      + '</span><span class="' + cls + '">' + val + '</span></div>';
+  }}
+
+  function buildTooltip(pt) {{
+    var html = '<div class="tt-title">' + pt.p + ' гПа'
+      + (pt.h !== null ? ' · ' + pt.h + ' м' : '') + '</div>';
+    html += row('T',  pt.T + ' °C',  pt.T < 0 ? 'tt-cold' : 'tt-warm');
+    html += row('Td', pt.Td + ' °C', 'tt-cold');
+    html += row('RH', pt.RH + ' %');
+    html += row('θ',  pt.theta + ' K');
+    html += row('mr', pt.mixr + ' г/кг');
+    html += row('Ветер', pt.wind);
+    return html;
+  }}
+
+  setTimeout(function() {{
+    var svg = wrap.querySelector('svg');
+    if (!svg) return;
+    POINTS.forEach(function(pt) {{
+      var el = document.createElement('div');
+      el.className = 'hotspot';
+      var y_pct = pct_y(pt.p);
+      var x_pct = 55 + (1 - y_pct / 100) * 15;
+      el.style.left = x_pct + '%';
+      el.style.top  = y_pct + '%';
+      el.addEventListener('mouseenter', function() {{
+        tt.innerHTML = buildTooltip(pt);
+        tt.style.display = 'block';
+      }});
+      el.addEventListener('mouseleave', function() {{
+        tt.style.display = 'none';
+      }});
+      wrap.appendChild(el);
+    }});
+  }}, 100);
+}})();
+</script>
+</body>
+</html>
+"""
+
+
+def sounding_view(station):
+    """РЎС‚СЂР°РЅРёС†Р° Skew-T РґРёР°РіСЂР°РјРјС‹ РґР»СЏ СЃС‚Р°РЅС†РёРё Р·РѕРЅРґРёСЂРѕРІР°РЅРёСЏ (SVG + tooltip)."""
     df = fetch_sounding(station.upper())
     if df is None:
         return render_template_string(
-            "<h1>Нет данных для станции {{ s }}</h1>",
+            "<h1>РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ СЃС‚Р°РЅС†РёРё {{ s }}</h1>",
+            s=station.upper(),
+        ), 404
+
+    svg, points = render_skewt_svg(df, station=station.upper(), ts=None)
+    import json as _json
+    return render_template_string(
+        SOUNDING_TOOLTIP_HTML,
+        station=station.upper(),
+        svg=svg,
+        points_json=_json.dumps(points, ensure_ascii=False),
+    )
+def sounding_view(station):
+    """РЎС‚СЂР°РЅРёС†Р° Skew-T РґРёР°РіСЂР°РјРјС‹ РґР»СЏ СЃС‚Р°РЅС†РёРё Р·РѕРЅРґРёСЂРѕРІР°РЅРёСЏ."""
+    df = fetch_sounding(station.upper())
+    if df is None:
+        return render_template_string(
+            "<h1>РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ СЃС‚Р°РЅС†РёРё {{ s }}</h1>",
             s=station.upper(),
         ), 404
 
@@ -2122,6 +2316,258 @@ def sounding_view(station):
         '</body></html>',
         png=png_b64,
     )
+
+
+# SOUNDING_VIEW_FSTRING_V3_2
+def sounding_view(station):
+    """Страница Skew-T: SVG + tooltip. Без Jinja2 (f-string)."""
+    import json as _json
+
+    df = fetch_sounding(station.upper())
+    if df is None:
+        return f"<h1>Нет данных для станции {station.upper()}</h1>", 404
+
+    svg, points = render_skewt_svg(df, station=station.upper(), ts=None)
+    points_json = _json.dumps(points, ensure_ascii=False)
+
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skew-T — {station.upper()}</title>
+<style>
+  html, body {{ margin: 0; padding: 0; background: #0a0e1a; color: #e8eefc;
+    font-family: 'Inter', -apple-system, sans-serif; }}
+  .wrap {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+  .head {{ display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }}
+  .head h1 {{ margin: 0; font-size: 20px; }}
+  .head a {{ color: #4dabff; text-decoration: none; font-size: 13px;
+    padding: 6px 12px; border-radius: 8px;
+    background: rgba(77,171,255,0.08); border: 1px solid rgba(77,171,255,0.2); }}
+  .head a:hover {{ background: rgba(77,171,255,0.15); }}
+  .skew-wrap {{ position: relative; background: #ffffff; border-radius: 12px;
+    padding: 8px; box-shadow: 0 20px 40px -20px rgba(77,171,255,0.4); }}
+  .skew-wrap svg {{ display: block; width: 100%; height: auto; }}
+  .skew-wrap .hotspot {{ position: absolute; width: 18px; height: 18px;
+    border-radius: 50%; background: rgba(77,171,255,0);
+    border: 1px solid rgba(77,171,255,0); cursor: crosshair;
+    transition: background 0.15s, border-color 0.15s;
+    transform: translate(-50%, -50%); pointer-events: auto; z-index: 5; }}
+  .skew-wrap .hotspot:hover {{ background: rgba(77,171,255,0.35);
+    border-color: rgba(77,171,255,0.9); }}
+  .tooltip {{ position: fixed; pointer-events: none; z-index: 10000;
+    background: rgba(10,14,26,0.97); border: 1px solid rgba(120,160,255,0.4);
+    border-radius: 10px; padding: 10px 14px; font-size: 12px;
+    font-family: 'JetBrains Mono', monospace; color: #e8eefc;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5); display: none;
+    white-space: nowrap; line-height: 1.75; min-width: 210px; }}
+  .tooltip .tt-title {{ font-family: 'Inter', sans-serif; font-weight: 700;
+    font-size: 13px; color: #4dabff; margin-bottom: 6px; }}
+  .tooltip .tt-row {{ display: flex; justify-content: space-between; gap: 16px; }}
+  .tooltip .tt-row span:first-child {{ color: #8892b0; }}
+  .tooltip .tt-row span:last-child {{ font-weight: 600; }}
+  .tooltip .tt-cold {{ color: #6bb6ff; }}
+  .tooltip .tt-warm {{ color: #ffb547; }}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <a href="/">← На главную</a>
+    <h1>Skew-T — {station.upper()}</h1>
+  </div>
+  <div class="skew-wrap" id="skew-wrap">{svg}</div>
+</div>
+<div class="tooltip" id="tt"></div>
+<script>
+(function() {{
+  var POINTS = {points_json};
+  var wrap = document.getElementById('skew-wrap');
+  var tt = document.getElementById('tt');
+
+  function pct_y(p_hpa) {{
+    var p0 = 1000, p1 = 100;
+    var v = (Math.log(p0) - Math.log(p_hpa)) / (Math.log(p0) - Math.log(p1));
+    return v * 100;
+  }}
+
+  document.addEventListener('mousemove', function(e) {{
+    if (tt.style.display !== 'block') return;
+    var pad = 14;
+    var x = e.clientX + pad, y = e.clientY + pad;
+    if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - pad;
+    if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - pad;
+    tt.style.left = x + 'px'; tt.style.top = y + 'px';
+  }});
+
+  function row(lbl, val, cls) {{
+    cls = cls || '';
+    return '<div class="tt-row"><span>' + lbl
+      + '</span><span class="' + cls + '">' + val + '</span></div>';
+  }}
+
+  function buildTooltip(pt) {{
+    var html = '<div class="tt-title">' + pt.p + ' гПа'
+      + (pt.h !== null ? ' · ' + pt.h + ' м' : '') + '</div>';
+    html += row('T',  pt.T + ' °C',  pt.T < 0 ? 'tt-cold' : 'tt-warm');
+    html += row('Td', pt.Td + ' °C', 'tt-cold');
+    html += row('RH', pt.RH + ' %');
+    html += row('θ',  pt.theta + ' K');
+    html += row('mr', pt.mixr + ' г/кг');
+    html += row('Ветер', pt.wind);
+    return html;
+  }}
+
+  setTimeout(function() {{
+    var svg = wrap.querySelector('svg');
+    if (!svg) return;
+    POINTS.forEach(function(pt) {{
+      var el = document.createElement('div');
+      el.className = 'hotspot';
+      var y_pct = pct_y(pt.p);
+      var x_pct = 55 + (1 - y_pct / 100) * 15;
+      el.style.left = x_pct + '%';
+      el.style.top  = y_pct + '%';
+      el.addEventListener('mouseenter', function() {{
+        tt.innerHTML = buildTooltip(pt);
+        tt.style.display = 'block';
+      }});
+      el.addEventListener('mouseleave', function() {{
+        tt.style.display = 'none';
+      }});
+      wrap.appendChild(el);
+    }});
+  }}, 100);
+}})();
+</script>
+</body>
+</html>
+"""
+
+
+
+# SOUNDING_VIEW_FSTRING_V4
+@app.route("/sounding/<station>")
+def sounding_view(station):
+    """Страница Skew-T: SVG + tooltip с точными координатами."""
+    import json as _json
+
+    df = fetch_sounding(station.upper())
+    if df is None:
+        return f"<h1>Нет данных для станции {station.upper()}</h1>", 404
+
+    svg, points = render_skewt_svg(df, station=station.upper(), ts=None)
+    points_json = _json.dumps(points, ensure_ascii=False)
+
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skew-T — {station.upper()}</title>
+<style>
+  html, body {{ margin: 0; padding: 0; background: #0a0e1a; color: #e8eefc;
+    font-family: 'Inter', -apple-system, sans-serif; }}
+  .wrap {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+  .head {{ display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }}
+  .head h1 {{ margin: 0; font-size: 20px; }}
+  .head a {{ color: #4dabff; text-decoration: none; font-size: 13px;
+    padding: 6px 12px; border-radius: 8px;
+    background: rgba(77,171,255,0.08); border: 1px solid rgba(77,171,255,0.2); }}
+  .head a:hover {{ background: rgba(77,171,255,0.15); }}
+  .skew-wrap {{ position: relative; background: #ffffff; border-radius: 12px;
+    padding: 8px; box-shadow: 0 20px 40px -20px rgba(77,171,255,0.4); }}
+  .skew-wrap svg {{ display: block; width: 100%; height: auto; }}
+  .skew-wrap .hotspot {{ position: absolute; width: 16px; height: 16px;
+    border-radius: 50%; background: rgba(77,171,255,0);
+    border: 1px solid rgba(77,171,255,0.35); cursor: crosshair;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    transform: translate(-50%, -50%); pointer-events: auto; z-index: 5; }}
+  .skew-wrap .hotspot:hover {{ background: rgba(77,171,255,0.55);
+    border-color: rgba(77,171,255,1); transform: translate(-50%, -50%) scale(1.3); }}
+  .tooltip {{ position: fixed; pointer-events: none; z-index: 10000;
+    background: rgba(10,14,26,0.97); border: 1px solid rgba(120,160,255,0.4);
+    border-radius: 10px; padding: 10px 14px; font-size: 12px;
+    font-family: 'JetBrains Mono', monospace; color: #e8eefc;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5); display: none;
+    white-space: nowrap; line-height: 1.75; min-width: 210px; }}
+  .tooltip .tt-title {{ font-family: 'Inter', sans-serif; font-weight: 700;
+    font-size: 13px; color: #4dabff; margin-bottom: 6px; }}
+  .tooltip .tt-row {{ display: flex; justify-content: space-between; gap: 16px; }}
+  .tooltip .tt-row span:first-child {{ color: #8892b0; }}
+  .tooltip .tt-row span:last-child {{ font-weight: 600; }}
+  .tooltip .tt-cold {{ color: #6bb6ff; }}
+  .tooltip .tt-warm {{ color: #ffb547; }}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <a href="/">← На главную</a>
+    <h1>Skew-T — {station.upper()}</h1>
+  </div>
+  <div class="skew-wrap" id="skew-wrap">{svg}</div>
+</div>
+<div class="tooltip" id="tt"></div>
+<script>
+(function() {{
+  var POINTS = {points_json};
+  var wrap = document.getElementById('skew-wrap');
+  var tt = document.getElementById('tt');
+
+  document.addEventListener('mousemove', function(e) {{
+    if (tt.style.display !== 'block') return;
+    var pad = 14;
+    var x = e.clientX + pad, y = e.clientY + pad;
+    if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - pad;
+    if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - pad;
+    tt.style.left = x + 'px'; tt.style.top = y + 'px';
+  }});
+
+  function row(lbl, val, cls) {{
+    cls = cls || '';
+    return '<div class="tt-row"><span>' + lbl
+      + '</span><span class="' + cls + '">' + val + '</span></div>';
+  }}
+
+  function buildTooltip(pt) {{
+    var html = '<div class="tt-title">' + pt.p + ' гПа'
+      + (pt.h !== null ? ' · ' + pt.h + ' м' : '') + '</div>';
+    html += row('T',  pt.T + ' °C',  pt.T < 0 ? 'tt-cold' : 'tt-warm');
+    html += row('Td', pt.Td + ' °C', 'tt-cold');
+    html += row('RH', pt.RH + ' %');
+    html += row('θ',  pt.theta + ' K');
+    html += row('mr', pt.mixr + ' г/кг');
+    html += row('Ветер', pt.wind);
+    return html;
+  }}
+
+  setTimeout(function() {{
+    var svg = wrap.querySelector('svg');
+    if (!svg) return;
+    POINTS.forEach(function(pt) {{
+      if (pt.x_pct === null || pt.y_pct === null) return;
+      var el = document.createElement('div');
+      el.className = 'hotspot';
+      el.style.left = pt.x_pct + '%';
+      el.style.top  = pt.y_pct + '%';
+      el.addEventListener('mouseenter', function() {{
+        tt.innerHTML = buildTooltip(pt);
+        tt.style.display = 'block';
+      }});
+      el.addEventListener('mouseleave', function() {{
+        tt.style.display = 'none';
+      }});
+      wrap.appendChild(el);
+    }});
+  }}, 100);
+}})();
+</script>
+</body>
+</html>
+"""
+
 
 
 if __name__ == "__main__":
