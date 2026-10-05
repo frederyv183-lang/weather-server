@@ -20,29 +20,60 @@ from siphon.simplewebservice.wyoming import WyomingUpperAir
 TOOLTIP_LEVELS = {1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100}
 
 
+# FALLBACK v2 (много сроков)
 def fetch_sounding(station, ts=None):
-    """Получить данные зондирования Wyoming. Возвращает DataFrame или None."""
-    if ts is None:
+    """
+    Получить данные зондирования Wyoming.
+
+    Если ts не задан — перебираем последние сроки (0Z и 12Z)
+    до 5 дней назад, пока не найдём доступные данные.
+    Это нужно потому, что Wyoming часто отдаёт данные с задержкой
+    1–3 дня, а для некоторых станций — до 5.
+
+    Args:
+        station: код станции (например, 'ALB', '27730')
+        ts: конкретное время UTC. Если None — автопоиск.
+
+    Returns:
+        pandas.DataFrame или None
+    """
+    station = station.upper()
+
+    # Список кандидатов времени: если ts задан — только он;
+    # если нет — 0Z и 12Z за последние 5 дней, от свежих к старым.
+    if ts is not None:
+        candidates = [ts]
+    else:
         now = datetime.utcnow()
-        if now.hour > 13:
-            ts = now.replace(hour=12, minute=0, second=0, microsecond=0)
-        elif now.hour > 1:
-            ts = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        else:
-            ts = (now - timedelta(days=1)).replace(
-                hour=12, minute=0, second=0, microsecond=0
-            )
-    try:
-        df = WyomingUpperAir.request_data(ts, station.upper())
-        if df is None or df.empty:
-            return None
-        return df
-    except Exception as e:
-        print("[soundings] %s: %s" % (station, e))
-        return None
+        candidates = []
+        for days_ago in range(0, 6):
+            day = (now - timedelta(days=days_ago)).replace(
+                minute=0, second=0, microsecond=0)
+            for hour in (12, 0):
+                cand = day.replace(hour=hour)
+                if cand > now:
+                    continue
+                candidates.append(cand)
+
+    last_error = None
+    for cand in candidates:
+        try:
+            df = WyomingUpperAir.request_data(cand, station)
+            if df is not None and not df.empty:
+                print("[soundings] %s: got %s (%d rows)"
+                      % (station, cand, len(df)))
+                return df
+        except Exception as e:
+            last_error = e
+            continue
+
+    if last_error:
+        print("[soundings] %s: no data, last error: %s" % (station, last_error))
+    else:
+        print("[soundings] %s: no data in last 5 days" % station)
+    return None
 
 
-# v4: точные координаты через transData
 def render_skewt_svg(df, station=None, ts=None):
     """
     Рисует Skew-T и возвращает (svg_str, points).

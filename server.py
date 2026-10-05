@@ -2570,5 +2570,218 @@ def sounding_view(station):
 
 
 
+
+
+# SOUNDING_MAP_HTML_V1
+from data.stations import get_stations, find_nearest_stations
+
+
+@app.route("/sounding-map")
+def sounding_map():
+    """HTML-страница с картой станций зондирования."""
+    return _SOUNDING_MAP_HTML
+
+
+@app.route("/api/sounding/stations")
+def api_sounding_stations():
+    """JSON со всеми станциями Wyoming."""
+    try:
+        return jsonify({"stations": get_stations()})
+    except Exception as e:
+        return jsonify({"stations": [], "error": str(e)}), 500
+
+
+@app.route("/api/sounding/nearest")
+def api_sounding_nearest():
+    """Ближайшие N станций к точке."""
+    try:
+        lat = float(request.args.get("lat"))
+        lon = float(request.args.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "lat/lon required"}), 400
+    try:
+        n = int(request.args.get("n", 5))
+    except (TypeError, ValueError):
+        n = 5
+    n = max(1, min(n, 20))
+    try:
+        return jsonify({"stations": find_nearest_stations(lat, lon, n=n)})
+    except Exception as e:
+        return jsonify({"stations": [], "error": str(e)}), 500
+
+
+# SOUNDING_MAP_HTML_V2_FIXED
+_SOUNDING_MAP_HTML = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта зондирования</title>
+<link rel="stylesheet" href="/static/leaflet/leaflet.css">
+<script src="/static/leaflet/leaflet.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0a0e1a;
+    color: #e8eefc; font-family: 'Inter', -apple-system, sans-serif; }
+  .layout { display: grid; grid-template-columns: 1fr 520px; height: 100vh; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: 45vh 55vh; }
+  }
+  #map { width: 100%; height: 100%; min-height: 300px; }
+  .panel { background: #0f1524; border-left: 1px solid rgba(120,160,255,0.15);
+    display: flex; flex-direction: column; overflow: hidden; }
+  .panel-head { padding: 12px 16px; border-bottom: 1px solid rgba(120,160,255,0.15);
+    display: flex; gap: 10px; align-items: center; }
+  .panel-head input { flex: 1; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid rgba(120,160,255,0.25); background: #161d2f;
+    color: #e8eefc; outline: none; font-size: 13px; }
+  .panel-head input:focus { border-color: #4dabff; }
+  .panel-head button { padding: 9px 14px; border-radius: 8px; border: none;
+    background: linear-gradient(135deg, #4dabff, #7c5cff); color: #fff;
+    cursor: pointer; font-weight: 600; font-size: 13px; }
+  .panel-head button:hover { opacity: 0.9; }
+  .stations-list { padding: 8px 12px; border-bottom: 1px solid rgba(120,160,255,0.15);
+    max-height: 160px; overflow-y: auto; font-size: 12px; }
+  .stations-list .item { display: flex; justify-content: space-between;
+    padding: 6px 8px; border-radius: 6px; cursor: pointer; color: #a8b4d0;
+    font-family: 'JetBrains Mono', monospace; }
+  .stations-list .item:hover { background: rgba(77,171,255,0.1); color: #e8eefc; }
+  .stations-list .item.active { background: rgba(77,171,255,0.25); color: #fff; }
+  .stations-list .item .km { color: #6b7694; }
+  #skew-frame { flex: 1; width: 100%; border: none; background: #0a0e1a; min-height: 300px; }
+  .hint { padding: 10px 16px; font-size: 12px; color: #6b7694;
+    border-bottom: 1px solid rgba(120,160,255,0.15); }
+  /* Маркеры станций (divIcon) */
+  .station-dot { width: 16px !important; height: 16px !important;
+    background: radial-gradient(circle, #4dabff 0%, #4dabff 60%, rgba(77,171,255,0.4) 100%);
+    border: 2px solid #fff; border-radius: 50%;
+    box-shadow: 0 0 8px rgba(77,171,255,0.9);
+    cursor: pointer; transition: transform 0.15s; }
+  .station-dot:hover { transform: scale(1.3); }
+  .station-label { display: none; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div id="map"></div>
+  <div class="panel">
+    <div class="panel-head">
+      <input id="q" type="text" placeholder="Москва, Лондон, Tokyo...">
+      <button onclick="doSearch()">Найти</button>
+    </div>
+    <div class="hint" id="hint">Кликните по маркеру на карте или введите город</div>
+    <div class="stations-list" id="nearest"></div>
+    <iframe id="skew-frame" src="about:blank"></iframe>
+  </div>
+</div>
+<script>
+var map = L.map('map', { worldCopyJump: true }).setView([50, -20], 3);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap', maxZoom: 19
+}).addTo(map);
+
+// 1. Форсируем пересчёт размера, когда DOM готов и CSS применён
+setTimeout(function() {
+  map.invalidateSize();
+  map.setView([50, -20], 3);
+}, 150);
+
+// 2. Пересчитываем при изменении окна
+window.addEventListener('resize', function() {
+  map.invalidateSize();
+});
+
+var markers = {};
+
+function makeIcon() {
+  return L.divIcon({
+    className: 'station-dot-wrap',
+    html: '<div class="station-dot"></div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+}
+
+// SOUNDING_MAP_LOADSTATIONS_V3
+function loadStations() {
+  fetch('/api/sounding/stations')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      (data.stations || []).forEach(function(s) {
+        var m = L.marker([s.lat, s.lon], {
+          icon: makeIcon(),
+          interactive: true,
+          keyboard: false,
+          riseOnHover: true
+        }).addTo(map);
+        m.bindTooltip(s.name + ' (' + s.station + ')',
+                      { direction: 'top', offset: [0, -8] });
+        // IIFE — чтобы code был свой у каждого обработчика
+        m.on('click', (function(code) {
+          return function(e) {
+            L.DomEvent.stopPropagation(e);
+            L.DomEvent.preventDefault(e);
+            console.log('station clicked:', code);
+            openStation(code);
+          };
+        })(s.station));
+        markers[s.station] = m;
+      });
+      console.log('[sounding-map] loaded', (data.stations || []).length, 'stations');
+    })
+    .catch(function(err) {
+      console.error('[sounding-map] loadStations error:', err);
+    });
+}
+
+function openStation(code) {
+  document.getElementById('skew-frame').src = '/sounding/' + code + '?t=' + Date.now();
+  document.getElementById('hint').textContent = 'Станция: ' + code;
+  document.querySelectorAll('.stations-list .item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.code === code);
+  });
+}
+
+function doSearch() {
+  var q = document.getElementById('q').value.trim();
+  if (!q) return;
+  fetch('/api/geocode?q=' + encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var r0 = (data.results || [])[0];
+      if (!r0) { document.getElementById('hint').textContent = 'Не найдено'; return; }
+      var lat = r0.latitude, lon = r0.longitude;
+      map.setView([lat, lon], 6);
+      fetch('/api/sounding/nearest?lat=' + lat + '&lon=' + lon + '&n=8')
+        .then(function(r){ return r.json(); })
+        .then(function(d) {
+          var box = document.getElementById('nearest');
+          box.innerHTML = '';
+          (d.stations || []).forEach(function(s) {
+            var el = document.createElement('div');
+            el.className = 'item';
+            el.dataset.code = s.station;
+            el.innerHTML = '<span>' + s.name + ' (' + s.station + ')</span>'
+                         + '<span class="km">' + s.distance_km + ' км</span>';
+            el.onclick = function() { openStation(s.station); };
+            box.appendChild(el);
+          });
+          if (d.stations && d.stations.length) {
+            openStation(d.stations[0].station);
+          }
+        });
+    });
+}
+
+document.getElementById('q').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doSearch();
+});
+
+loadStations();
+</script>
+</body>
+</html>
+"""
+
+
 if __name__ == "__main__":
     app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5000)
