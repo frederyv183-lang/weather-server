@@ -9,6 +9,12 @@ BASE_STYLE = """
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Weather-msk">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <style>
   :root, [data-theme="dark"] {
     --bg-0: #0a0e1a; --bg-1: #0f1524; --bg-2: #161d2f;
@@ -323,6 +329,15 @@ COMMON_JS = """
     localStorage.setItem('weather-bg-weather', w);
   };
 })();
+
+// Регистрация Service Worker для PWA
+if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", function() {
+    navigator.serviceWorker.register("/static/service-worker.js")
+      .then(function(reg) { console.log("[PWA] SW registered:", reg.scope); })
+      .catch(function(err) { console.warn("[PWA] SW error:", err); });
+  });
+}
 </script>
 """
 

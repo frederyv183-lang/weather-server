@@ -62,6 +62,15 @@ logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
+
+
+@app.route("/static/service-worker.js")
+def service_worker():
+    """Service Worker для PWA."""
+    return app.send_static_file("service-worker.js"), 200, {
+        "Content-Type": "application/javascript",
+        "Service-Worker-Allowed": "/",
+    }
 # === Планировщик карт (фоновое обновление) ===
 # На Render фоновый шедулер отключён через переменную SKIP_SCHEDULER=1
 import os as _os

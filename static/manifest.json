@@ -1,0 +1,45 @@
+{
+  "name": "Weather-msk — прогноз погоды",
+  "short_name": "Weather-msk",
+  "description": "Синоптические карты и прогноз погоды по моделям GFS, ECMWF, ICON",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["weather", "utilities"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Прогноз",
+      "url": "/forecast",
+      "description": "Таблица прогноза погоды"
+    },
+    {
+      "name": "Синоптические карты",
+      "url": "/synoptic-maps",
+      "description": "Карты АТ и ОТ"
+    },
+    {
+      "name": "Климат",
+      "url": "/climate",
+      "description": "Климатические индексы"
+    }
+  ]
+}
