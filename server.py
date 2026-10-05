@@ -74,6 +74,7 @@ def service_worker():
 # === Планировщик карт (фоновое обновление) ===
 # На Render фоновый шедулер отключён через переменную SKIP_SCHEDULER=1
 import os as _os
+from data.soundings import fetch_sounding, render_skewt
 if _os.environ.get("SKIP_SCHEDULER") != "1":
     from scheduler import init_scheduler
     init_scheduler(app)
@@ -2098,5 +2099,30 @@ def api_noaa_historical():
 
 
 # ------------------------------------------------------------------
+
+
+@app.route("/sounding/<station>")
+def sounding_view(station):
+    """Страница Skew-T диаграммы для станции зондирования."""
+    df = fetch_sounding(station.upper())
+    if df is None:
+        return render_template_string(
+            "<h1>Нет данных для станции {{ s }}</h1>",
+            s=station.upper(),
+        ), 404
+
+    png_b64 = render_skewt(df)
+    return render_template_string(
+        '<!DOCTYPE html>'
+        '<html><body style="background:#0a0e1a;'
+        'display:flex;justify-content:center;align-items:center;'
+        'min-height:100vh;margin:0;">'
+        '<img src="data:image/png;base64,{{ png }}" '
+        'style="max-width:100%;max-height:95vh;border-radius:12px;">'
+        '</body></html>',
+        png=png_b64,
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5000)
