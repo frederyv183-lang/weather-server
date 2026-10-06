@@ -2,6 +2,7 @@
 """Генерация карт АТ/PMSL с изогипсами, изотермами, изотахами и городами."""
 
 import os
+from synoptic_maps.storage import get_archive_dir
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -19,7 +20,7 @@ from synoptic_maps.config import AT_LEVELS, REGIONS, CITIES
 
 
 OUTPUT_DIR = "static/synoptic_maps"
-ARCHIVE_DIR = os.path.join(OUTPUT_DIR, "archive")
+ARCHIVE_DIR = get_archive_dir()
 
 ARCHIVE_RETENTION_DAYS = 3
 DOWNLOAD_TIMEOUT = 180
@@ -538,6 +539,8 @@ def generate_maps(levels=None, steps=None, regions=None,
                   show_isohypse=True, show_isotherm=True,
                   show_isotach=True, include_ot=False):
     """Генерирует карты для всех комбинаций level × step × region."""
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+
     if levels is None:
         levels = list(AT_LEVELS.keys())
     if steps is None:
@@ -606,6 +609,8 @@ def generate_maps(levels=None, steps=None, regions=None,
 
 
 def cleanup_old_archive():
+
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
     import shutil
     if not os.path.isdir(ARCHIVE_DIR):
         return 0

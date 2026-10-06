@@ -31,17 +31,16 @@ _scheduler = None
 
 
 def job_synoptic_maps():
-    """Генерация карт АТ с изотермами и городами + очистка архива."""
+    """Генерация карт АТ + очистка архива."""
     print("[scheduler] Генерация синоптических карт АТ...", flush=True)
     try:
         from synoptic_maps.generator import (
-            generate_at_maps, cleanup_old_archive,
+            generate_maps, cleanup_old_archive,
         )
-        files = generate_at_maps(
+        files = generate_maps(
             levels=(500, 850),
-            steps=(0, 24),
-            regions=("nh", "europe"),
-            overlays=("isotherms",),
+            steps=(0, 12, 24),
+            regions=("etr",),
             include_ot=True,
         )
         removed = cleanup_old_archive()

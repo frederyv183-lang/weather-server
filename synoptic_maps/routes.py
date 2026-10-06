@@ -142,3 +142,14 @@ def api_at_find():
             matches.append(rel)
     matches.sort(reverse=True)
     return jsonify({"file": matches[0] if matches else None})
+
+
+# === Отдача PNG-карт из архива (static/ или /tmp/) ===
+from flask import send_from_directory
+from synoptic_maps.storage import get_archive_dir
+
+
+@synoptic_maps_bp.route("/synoptic-maps-file/<path:filename>")
+def synoptic_maps_file(filename):
+    """Отдаёт PNG-карту из архива."""
+    return send_from_directory(get_archive_dir(), filename, mimetype="image/png")

@@ -94,3 +94,8 @@ python
 add_soundings*.py
 add_mobile*.py
 *.bak
+
+_patch_backup/
+apply_maps_patch.py
+fix_*.py
+
