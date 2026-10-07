@@ -468,6 +468,27 @@ AVIATION_HTML = """<!DOCTYPE html>
     border-radius: 12px; padding: 16px; color: #ff5470;
     margin: 16px 0;
   }
+
+  /* [PATCH ui.synoptic.day_summary] */
+  .day-summary {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 8px 0 12px 0;
+    padding: 10px 14px;
+    background: rgba(77, 171, 255, 0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-1);
+  }
+  .day-summary .situation {
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .day-summary .phenomena {
+    color: var(--text-0);
+  }
 </style>
 </head>
 <body>
@@ -550,6 +571,14 @@ AVIATION_HTML = """<!DOCTYPE html>
   <div class="day-header">
     <div class="day-title">📅 {{ day.date | date_ru }}</div>
   </div>
+
+  <!-- [PATCH ui.synoptic.day_summary] -->
+  {% if day.summary %}
+  <div class="day-summary">
+    <span class="situation">🌍 {{ day.summary.situation }}</span>
+    <span class="phenomena">{{ day.summary.phenomena }}</span>
+  </div>
+  {% endif %}
 
   <div style="overflow-x:auto;">
   <table class="hour-table">
